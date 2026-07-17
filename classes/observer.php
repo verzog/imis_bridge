@@ -122,15 +122,10 @@ class observer {
             return;
         }
 
-        // Calculate percentage score.
-        $score = 0.0;
-        if (!empty($attempt->sumgrades)) {
-            $score = round(($attempt->sumgrades / $quiz->sumgrades) * 100, 2);
-        }
-
-        // Use gradepass as the pass threshold, falling back to 50 if not set.
-        $passmark = !empty($quiz->gradepass) ? $quiz->gradepass : 50;
-        $status   = ($score >= $passmark) ? 'Pass' : 'Fail';
+        // Calculate percentage score and pass/fail status.
+        $score    = self::calculate_percentage((float)($attempt->sumgrades ?? 0), (float)$quiz->sumgrades);
+        $passmark = !empty($quiz->gradepass) ? (float)$quiz->gradepass : 50.0;
+        $status   = self::passfail_status($score, $passmark);
         $finish   = !empty($attempt->timefinish) ? date('Y-m-d', $attempt->timefinish) : date('Y-m-d');
         $start    = !empty($attempt->timestart) ? date('Y-m-d', $attempt->timestart) : date('Y-m-d');
 
@@ -187,6 +182,33 @@ class observer {
             'score'          => $score,
         ]);
         \core\task\manager::queue_adhoc_task($task);
+    }
+
+    /**
+     * Percentage score for an attempt, rounded to two decimal places.
+     *
+     * Returns 0 when the quiz is not gradable, guarding against divide-by-zero.
+     *
+     * @param float $attemptsum The learner's summed grade for the attempt.
+     * @param float $quizsum    The maximum summed grade for the quiz.
+     * @return float
+     */
+    public static function calculate_percentage(float $attemptsum, float $quizsum): float {
+        if ($quizsum <= 0) {
+            return 0.0;
+        }
+        return round(($attemptsum / $quizsum) * 100, 2);
+    }
+
+    /**
+     * Map a score against a pass mark to the iMIS 'Pass'/'Fail' status.
+     *
+     * @param float $score    The percentage score.
+     * @param float $passmark The pass threshold.
+     * @return string 'Pass' or 'Fail'.
+     */
+    public static function passfail_status(float $score, float $passmark): string {
+        return ($score >= $passmark) ? 'Pass' : 'Fail';
     }
 
     /**
