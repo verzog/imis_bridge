@@ -69,7 +69,8 @@ final class observer_test extends \advanced_testcase {
     public function test_user_loggedin_queues_sync_task(): void {
         $this->resetAfterTest();
 
-        $user = $this->getDataGenerator()->create_user(['username' => 'MEMBER123']);
+        // Moodle stores usernames in lower case; the iMIS ID mirrors the username.
+        $user = $this->getDataGenerator()->create_user(['username' => 'member123']);
 
         $event = \core\event\user_loggedin::create([
             'userid'   => $user->id,
@@ -80,6 +81,6 @@ final class observer_test extends \advanced_testcase {
 
         $tasks = \core\task\manager::get_adhoc_tasks(sync_user_task::class);
         $this->assertCount(1, $tasks);
-        $this->assertSame('MEMBER123', reset($tasks)->get_custom_data()->imisid);
+        $this->assertSame('member123', reset($tasks)->get_custom_data()->imisid);
     }
 }
