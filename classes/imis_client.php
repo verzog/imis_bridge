@@ -61,11 +61,22 @@ class imis_client {
             throw new \moodle_exception('nowsdlconfigured', 'local_imisbridge');
         }
 
+        // Bound how long a request may block on iMIS so a slow or down endpoint
+        // cannot hang a cron worker. Applies to both connect and read.
+        $timeout = (int)get_config('local_imisbridge', 'ws_timeout');
+        if ($timeout <= 0) {
+            $timeout = 30;
+        }
+
         $this->soap = new \SoapClient($wsdl, [
-            'trace'        => true,
-            'exceptions'   => true,
-            'cache_wsdl'   => WSDL_CACHE_DISK,
-            'soap_version' => SOAP_1_1,
+            'trace'              => true,
+            'exceptions'         => true,
+            'cache_wsdl'         => WSDL_CACHE_DISK,
+            'soap_version'       => SOAP_1_1,
+            'connection_timeout' => $timeout,
+            'stream_context'     => stream_context_create([
+                'http' => ['timeout' => $timeout],
+            ]),
         ]);
     }
 

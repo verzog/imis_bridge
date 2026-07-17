@@ -30,8 +30,8 @@ require_capability('moodle/site:config', context_system::instance());
 
 $PAGE->set_url(new moodle_url('/local/imisbridge/admin/sync.php'));
 $PAGE->set_context(context_system::instance());
-$PAGE->set_title('iMIS Bridge - Manual Sync');
-$PAGE->set_heading('iMIS Bridge - Manual Sync');
+$PAGE->set_title(get_string('manualsynccontrols', 'local_imisbridge'));
+$PAGE->set_heading(get_string('manualsynccontrols', 'local_imisbridge'));
 
 // Use POST to avoid action/contactid appearing in browser history and server logs.
 $action    = optional_param('action', '', PARAM_ALPHANUMEXT);
@@ -40,40 +40,46 @@ $message   = '';
 $error     = '';
 
 if ($action && confirm_sesskey()) {
+    // A full all-user sync can be slow; give it room beyond the default web limit.
+    \core_php_time_limit::raise(300);
+
     try {
         $client = new \local_imisbridge\imis_client();
         $cid    = !empty($contactid) ? $contactid : null;
+        $scope  = $cid
+            ? get_string('forcontact', 'local_imisbridge', s($contactid))
+            : get_string('allusers', 'local_imisbridge');
 
         switch ($action) {
             case 'enrollments':
                 $client->sync_orders($cid);
-                $message = 'Enrollment sync completed' . ($cid ? ' for contact ' . s($cid) : ' for all users') . '.';
+                $message = get_string('syncdone', 'local_imisbridge', $scope);
                 break;
 
             case 'cancellations':
                 $client->sync_cancelled_orders($cid);
-                $message = 'Cancellation sync completed' . ($cid ? ' for contact ' . s($cid) : ' for all users') . '.';
+                $message = get_string('syncdone', 'local_imisbridge', $scope);
                 break;
 
             case 'groups':
                 $client->update_groups($cid);
-                $message = 'Group sync completed' . ($cid ? ' for contact ' . s($cid) : ' for all users') . '.';
+                $message = get_string('syncdone', 'local_imisbridge', $scope);
                 break;
 
             case 'all':
                 $client->sync_orders($cid);
                 $client->sync_cancelled_orders($cid);
                 $client->update_groups($cid);
-                $message = 'Full sync completed' . ($cid ? ' for contact ' . s($cid) : ' for all users') . '.';
+                $message = get_string('syncdone', 'local_imisbridge', $scope);
                 break;
         }
     } catch (\Exception $e) {
-        $error = 'Sync failed: ' . $e->getMessage();
+        $error = get_string('syncfailed', 'local_imisbridge', $e->getMessage());
     }
 }
 
 echo $OUTPUT->header();
-echo $OUTPUT->heading('iMIS Bridge - Manual Sync Controls');
+echo $OUTPUT->heading(get_string('manualsynccontrols', 'local_imisbridge'));
 
 if ($message) {
     echo $OUTPUT->notification($message, 'notifysuccess');
@@ -89,19 +95,24 @@ $cidvalue = s($contactid);
 
 echo html_writer::start_div('card mb-4');
 echo html_writer::start_div('card-body');
-echo html_writer::tag('h5', 'Optional: Filter by iMIS Contact ID', ['class' => 'card-title']);
+echo html_writer::tag('h5', get_string('filtercontactid', 'local_imisbridge'), ['class' => 'card-title']);
 echo '<form method="post" action="">';
 echo '<input type="hidden" name="sesskey" value="' . $sesskey . '">';
 echo html_writer::start_div('form-group');
-echo html_writer::tag('label', 'iMIS Contact ID (leave blank for all users)', ['for' => 'contactid']);
+echo html_writer::tag('label', get_string('contactid', 'local_imisbridge'), ['for' => 'contactid']);
 echo '<input type="text" id="contactid" name="contactid" class="form-control"'
-    . ' value="' . $cidvalue . '" placeholder="e.g. 12345">';
+    . ' value="' . $cidvalue . '" placeholder="' . s(get_string('contactidplaceholder', 'local_imisbridge')) . '">';
+echo html_writer::tag('small', get_string('contactidhelp', 'local_imisbridge'), ['class' => 'form-text text-muted']);
 echo html_writer::end_div();
 echo html_writer::start_div('mt-3 d-flex gap-2 flex-wrap');
-echo '<button type="submit" name="action" value="enrollments" class="btn btn-primary">Sync Enrollments</button>';
-echo '<button type="submit" name="action" value="cancellations" class="btn btn-warning">Sync Cancellations</button>';
-echo '<button type="submit" name="action" value="groups" class="btn btn-info">Sync Groups</button>';
-echo '<button type="submit" name="action" value="all" class="btn btn-success">Run Full Sync</button>';
+echo '<button type="submit" name="action" value="enrollments" class="btn btn-primary">'
+    . s(get_string('sync_enrollments', 'local_imisbridge')) . '</button>';
+echo '<button type="submit" name="action" value="cancellations" class="btn btn-warning">'
+    . s(get_string('sync_cancellations', 'local_imisbridge')) . '</button>';
+echo '<button type="submit" name="action" value="groups" class="btn btn-info">'
+    . s(get_string('sync_groups', 'local_imisbridge')) . '</button>';
+echo '<button type="submit" name="action" value="all" class="btn btn-success">'
+    . s(get_string('sync_all', 'local_imisbridge')) . '</button>';
 echo html_writer::end_div();
 echo '</form>';
 echo html_writer::end_div();
@@ -109,14 +120,14 @@ echo html_writer::end_div();
 
 echo html_writer::start_div('card');
 echo html_writer::start_div('card-body');
-echo html_writer::tag('h5', 'Scheduled Task Status', ['class' => 'card-title']);
-echo html_writer::tag('p', 'Scheduled nightly tasks run automatically via Moodle cron:');
-echo '<ul>'
-    . '<li><strong>02:00 UTC</strong> - Enrollment sync (all users)</li>'
-    . '<li><strong>02:15 UTC</strong> - Cancellation sync (all users)</li>'
-    . '<li><strong>02:30 UTC</strong> - Group sync (incremental, based on last run)</li>'
-    . '</ul>';
-echo html_writer::link($logsurl, 'View Task Logs', ['class' => 'btn btn-secondary btn-sm']);
+echo html_writer::tag('h5', get_string('scheduledtaskstatus', 'local_imisbridge'), ['class' => 'card-title']);
+echo html_writer::tag('p', get_string('scheduledtaskintro', 'local_imisbridge'));
+echo html_writer::start_tag('ul');
+echo html_writer::tag('li', get_string('schedule_enrollments', 'local_imisbridge'));
+echo html_writer::tag('li', get_string('schedule_cancellations', 'local_imisbridge'));
+echo html_writer::tag('li', get_string('schedule_groups', 'local_imisbridge'));
+echo html_writer::end_tag('ul');
+echo html_writer::link($logsurl, get_string('viewtasklogs', 'local_imisbridge'), ['class' => 'btn btn-secondary btn-sm']);
 echo html_writer::end_div();
 echo html_writer::end_div();
 

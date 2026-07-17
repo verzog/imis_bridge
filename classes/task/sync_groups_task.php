@@ -38,7 +38,7 @@ class sync_groups_task extends \core\task\scheduled_task {
      * @return string
      */
     public function get_name(): string {
-        return 'iMIS Bridge: Sync Groups';
+        return get_string('task_sync_groups', 'local_imisbridge');
     }
 
     /**

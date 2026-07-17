@@ -56,10 +56,41 @@ if ($hassiteconfig) {
         PARAM_TEXT
     ));
 
+    // Web service timeout (seconds) for calls to iMIS.
+    $settings->add(new admin_setting_configtext(
+        'local_imisbridge/ws_timeout',
+        get_string('ws_timeout', 'local_imisbridge'),
+        get_string('ws_timeout_desc', 'local_imisbridge'),
+        '30',
+        PARAM_INT
+    ));
+
+    // Default credit type recorded against iMIS activity records.
+    $settings->add(new admin_setting_configtext(
+        'local_imisbridge/credit_type',
+        get_string('credit_type', 'local_imisbridge'),
+        get_string('credit_type_desc', 'local_imisbridge'),
+        'CEU',
+        PARAM_ALPHANUMEXT
+    ));
+
+    // Course custom field short name holding the credit value.
+    $settings->add(new admin_setting_configtext(
+        'local_imisbridge/credit_field',
+        get_string('credit_field', 'local_imisbridge'),
+        get_string('credit_field_desc', 'local_imisbridge'),
+        '',
+        PARAM_ALPHANUMEXT
+    ));
+
     // Manual sync controls — link to admin tool page.
     $settings->add(new admin_setting_heading(
         'local_imisbridge/manual_sync_heading',
-        'Manual Sync Controls',
-        '<a href="' . new moodle_url('/local/imisbridge/admin/sync.php') . '" class="btn btn-primary">Open Sync Admin</a>'
+        get_string('manualsynccontrols', 'local_imisbridge'),
+        html_writer::link(
+            new moodle_url('/local/imisbridge/admin/sync.php'),
+            get_string('opensyncadmin', 'local_imisbridge'),
+            ['class' => 'btn btn-primary']
+        )
     ));
 }

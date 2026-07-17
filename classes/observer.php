@@ -15,7 +15,11 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Event observer — hooks into Moodle events and calls iMIS accordingly.
+ * Event observer — hooks into Moodle events and queues iMIS sync work.
+ *
+ * Observers never call iMIS synchronously: every external SOAP round-trip is
+ * pushed onto an adhoc task so it runs in cron rather than blocking the
+ * user-facing login/quiz/completion request.
  *
  * @package    local_imisbridge
  * @copyright  2024 Vernon Spain
@@ -32,10 +36,8 @@ namespace local_imisbridge;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class observer {
-    // USER LOGIN — sync enrollments + cancellations + groups for the logged-in user.
-
     /**
-     * Triggered on user login. Syncs enrollments, cancellations, and groups for the user.
+     * Triggered on user login. Queues a per-user enrolment/cancellation/group sync.
      *
      * @param \core\event\user_loggedin $event The login event.
      * @return void
@@ -43,37 +45,21 @@ class observer {
     public static function user_loggedin(\core\event\user_loggedin $event): void {
         global $DB;
 
-        $userid = $event->userid;
-        $user   = $DB->get_record('user', ['id' => $userid], 'id, username');
-        $imisid = $user->username; // Username == iMIS ID via SAML2.
-
-        if (empty($imisid)) {
+        $user = $DB->get_record('user', ['id' => $event->userid], 'id, username');
+        if (empty($user) || empty($user->username)) {
             return;
         }
 
-        try {
-            $client = new imis_client();
+        // Username == iMIS ID via SAML2.
+        $task = new task\sync_user_task();
+        $task->set_custom_data(['imisid' => $user->username]);
 
-            // Sync active enrollments for this user.
-            $client->sync_orders($imisid);
-
-            // Sync any cancellations for this user.
-            $client->sync_cancelled_orders($imisid);
-
-            // Update group memberships for this user.
-            $client->update_groups($imisid);
-        } catch (\Exception $e) {
-            debugging('iMIS Bridge login sync error for user ' . $imisid . ': ' . $e->getMessage(), DEBUG_NORMAL);
-        }
+        // Collapse repeat logins into a single queued sync.
+        \core\task\manager::queue_adhoc_task($task, true);
     }
 
-    // COURSE COMPLETED — push completion record to iMIS.
-
     /**
-     * Triggered on course completion. Pushes the completion record to iMIS.
-     *
-     * NOTE: credit_value is currently hardcoded to 0. This should be read from a
-     * course custom field before this plugin goes live.
+     * Triggered on course completion. Queues a completion record push to iMIS.
      *
      * @param \core\event\course_completed $event The course completed event.
      * @return void
@@ -82,46 +68,30 @@ class observer {
         global $DB;
 
         $data   = $event->get_data();
-        $userid = $data['relateduserid'];
-        $user   = $DB->get_record('user', ['id' => $userid], 'id, username');
+        $user   = $DB->get_record('user', ['id' => $data['relateduserid']], 'id, username');
+        $course = $DB->get_record('course', ['id' => $data['courseid']], 'id, idnumber, shortname');
 
-        if (empty($user)) {
+        if (empty($user) || empty($user->username) || empty($course)) {
             return;
         }
 
-        $imisid   = $user->username;
-        $courseid = $data['courseid'];
-        $course   = $DB->get_record('course', ['id' => $courseid], 'id, idnumber, shortname');
-
-        // Use course idnumber as the Moodle course number sent to iMIS.
-        // Fall back to shortname if idnumber is blank.
-        $coursenum = !empty($course->idnumber) ? $course->idnumber : $course->shortname;
-
-        // TODO MDL-0: Read credit value from a course custom field instead of hardcoding 0.
-        $creditvalue = 0;
-
-        try {
-            $client = new imis_client();
-            $client->update_activity_record(
-                imisid:         $imisid,
-                moodlecoursenum: $coursenum,
-                credittype:     'CEU',
-                creditvalue:    $creditvalue,
-                startdate:      date('Y-m-d'),
-                completiondate: date('Y-m-d'),
-                grantdate:      date('Y-m-d'),
-                status:         'Pass',
-                score:          0
-            );
-        } catch (\Exception $e) {
-            debugging('iMIS Bridge course completion error for user ' . $imisid . ': ' . $e->getMessage(), DEBUG_NORMAL);
-        }
+        $today = date('Y-m-d');
+        self::queue_activity_push(
+            $user->username,
+            self::course_number($course),
+            self::course_credit_value((int)$course->id),
+            $today,
+            $today,
+            $today,
+            'Pass',
+            0.0
+        );
     }
 
-    // QUIZ ATTEMPT SUBMITTED — push quiz score to iMIS.
-
     /**
-     * Triggered on quiz attempt submission. Pushes the quiz score to iMIS.
+     * Triggered on quiz attempt submission. Queues a graded record push to iMIS.
+     *
+     * Preview attempts (teacher previews) and ungraded quizzes are ignored.
      *
      * @param \mod_quiz\event\attempt_submitted $event The attempt submitted event.
      * @return void
@@ -129,55 +99,129 @@ class observer {
     public static function quiz_attempt_submitted(\mod_quiz\event\attempt_submitted $event): void {
         global $DB;
 
-        $data      = $event->get_data();
-        $userid    = $data['userid'];
-        $attemptid = $data['objectid'];
-
-        $user = $DB->get_record('user', ['id' => $userid], 'id, username');
-        if (empty($user)) {
+        $data = $event->get_data();
+        $user = $DB->get_record('user', ['id' => $data['userid']], 'id, username');
+        if (empty($user) || empty($user->username)) {
             return;
         }
 
-        $imisid = $user->username;
+        $attempt = $DB->get_record('quiz_attempts', ['id' => $data['objectid']]);
+        if (empty($attempt) || !empty($attempt->preview)) {
+            // Ignore teacher/preview attempts.
+            return;
+        }
 
-        // Load attempt and quiz details.
-        $attempt = $DB->get_record('quiz_attempts', ['id' => $attemptid]);
-        $quiz    = !empty($attempt) ? $DB->get_record('quiz', ['id' => $attempt->quiz]) : null;
-        $course  = !empty($quiz) ? $DB->get_record('course', ['id' => $quiz->course], 'id, idnumber, shortname') : null;
+        $quiz = $DB->get_record('quiz', ['id' => $attempt->quiz]);
+        if (empty($quiz) || empty($quiz->sumgrades)) {
+            // Ungraded quiz — nothing meaningful to report.
+            return;
+        }
 
-        if (!$attempt || !$quiz || !$course) {
-            debugging('iMIS Bridge quiz sync: could not load attempt/quiz/course for attempt ' . $attemptid, DEBUG_NORMAL);
+        $course = $DB->get_record('course', ['id' => $quiz->course], 'id, idnumber, shortname');
+        if (empty($course)) {
             return;
         }
 
         // Calculate percentage score.
-        $score = 0;
-        if (!empty($attempt->sumgrades) && !empty($quiz->sumgrades)) {
+        $score = 0.0;
+        if (!empty($attempt->sumgrades)) {
             $score = round(($attempt->sumgrades / $quiz->sumgrades) * 100, 2);
         }
 
         // Use gradepass as the pass threshold, falling back to 50 if not set.
-        $passmark  = !empty($quiz->gradepass) ? $quiz->gradepass : 50;
-        $status    = ($score >= $passmark) ? 'Pass' : 'Fail';
-        $coursenum = !empty($course->idnumber) ? $course->idnumber : $course->shortname;
-        $finishtime = !empty($attempt->timefinish) ? date('Y-m-d', $attempt->timefinish) : date('Y-m-d');
-        $starttime  = !empty($attempt->timestart) ? date('Y-m-d', $attempt->timestart) : date('Y-m-d');
+        $passmark = !empty($quiz->gradepass) ? $quiz->gradepass : 50;
+        $status   = ($score >= $passmark) ? 'Pass' : 'Fail';
+        $finish   = !empty($attempt->timefinish) ? date('Y-m-d', $attempt->timefinish) : date('Y-m-d');
+        $start    = !empty($attempt->timestart) ? date('Y-m-d', $attempt->timestart) : date('Y-m-d');
 
-        try {
-            $client = new imis_client();
-            $client->update_activity_record(
-                imisid:         $imisid,
-                moodlecoursenum: $coursenum,
-                credittype:     'CEU',
-                creditvalue:    0,
-                startdate:      $starttime,
-                completiondate: $finishtime,
-                grantdate:      $finishtime,
-                status:         $status,
-                score:          $score
-            );
-        } catch (\Exception $e) {
-            debugging('iMIS Bridge quiz sync error for user ' . $imisid . ': ' . $e->getMessage(), DEBUG_NORMAL);
+        self::queue_activity_push(
+            $user->username,
+            self::course_number($course),
+            self::course_credit_value((int)$course->id),
+            $start,
+            $finish,
+            $finish,
+            $status,
+            $score
+        );
+    }
+
+    /**
+     * Queue an activity-record push to iMIS.
+     *
+     * @param string $imisid         iMIS user ID (= Moodle username).
+     * @param string $coursenum      Moodle course number (maps to iMIS product code).
+     * @param float  $creditvalue    Number of credit hours awarded.
+     * @param string $startdate      Course start date (Y-m-d).
+     * @param string $completiondate Course completion date (Y-m-d).
+     * @param string $grantdate      Date credit hours were granted (Y-m-d).
+     * @param string $status         Pass or Fail.
+     * @param float  $score          Last test score.
+     * @return void
+     */
+    private static function queue_activity_push(
+        string $imisid,
+        string $coursenum,
+        float $creditvalue,
+        string $startdate,
+        string $completiondate,
+        string $grantdate,
+        string $status,
+        float $score
+    ): void {
+        $credittype = get_config('local_imisbridge', 'credit_type');
+        if (empty($credittype)) {
+            $credittype = 'CEU';
         }
+
+        $task = new task\push_activity_task();
+        $task->set_custom_data([
+            'imisid'         => $imisid,
+            'coursenum'      => $coursenum,
+            'credittype'     => $credittype,
+            'creditvalue'    => $creditvalue,
+            'startdate'      => $startdate,
+            'completiondate' => $completiondate,
+            'grantdate'      => $grantdate,
+            'status'         => $status,
+            'score'          => $score,
+        ]);
+        \core\task\manager::queue_adhoc_task($task);
+    }
+
+    /**
+     * Resolve the Moodle course number sent to iMIS: idnumber, falling back to shortname.
+     *
+     * @param \stdClass $course Course record with idnumber and shortname.
+     * @return string
+     */
+    private static function course_number(\stdClass $course): string {
+        return !empty($course->idnumber) ? $course->idnumber : $course->shortname;
+    }
+
+    /**
+     * Read the credit value from the configured course custom field.
+     *
+     * Returns 0 when no field is configured or the field holds a non-numeric value,
+     * preserving the previous default behaviour.
+     *
+     * @param int $courseid The Moodle course ID.
+     * @return float
+     */
+    private static function course_credit_value(int $courseid): float {
+        $shortname = get_config('local_imisbridge', 'credit_field');
+        if (empty($shortname)) {
+            return 0.0;
+        }
+
+        $handler = \core_course\customfield\course_handler::create();
+        foreach ($handler->get_instance_data($courseid, true) as $fielddata) {
+            if ($fielddata->get_field()->get('shortname') === $shortname) {
+                $value = $fielddata->get_value();
+                return is_numeric($value) ? (float)$value : 0.0;
+            }
+        }
+
+        return 0.0;
     }
 }
