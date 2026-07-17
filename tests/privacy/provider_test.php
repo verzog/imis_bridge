@@ -15,46 +15,44 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Scheduled task: sync iMIS enrollments for all users.
+ * Tests for the local_imisbridge privacy provider.
  *
  * @package    local_imisbridge
  * @copyright  2024 Vernon Spain
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace local_imisbridge\task;
+namespace local_imisbridge\privacy;
+
+use core_privacy\local\metadata\collection;
 
 /**
- * Syncs iMIS enrollments for all Moodle users.
+ * Unit tests for {@see provider}.
  *
  * @package    local_imisbridge
  * @copyright  2024 Vernon Spain
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers     \local_imisbridge\privacy\provider
  */
-class sync_enrollments_task extends \core\task\scheduled_task {
+final class provider_test extends \advanced_testcase {
     /**
-     * Returns the task name shown in the Moodle admin UI.
-     *
-     * @return string
-     */
-    public function get_name(): string {
-        return get_string('task_sync_enrollments', 'local_imisbridge');
-    }
-
-    /**
-     * Executes the enrollment sync for all users (empty contactId = all).
+     * The provider declares the external iMIS data flow.
      *
      * @return void
      */
-    public function execute(): void {
-        mtrace('iMIS Bridge: Starting enrollment sync for all users...');
-        try {
-            $client = new \local_imisbridge\imis_client();
-            $result = $client->sync_orders(null);
-            mtrace('iMIS Bridge: Enrollment sync complete. Result: ' . var_export($result, true));
-        } catch (\Exception $e) {
-            mtrace('iMIS Bridge: Enrollment sync FAILED: ' . $e->getMessage());
-            throw $e;
-        }
+    public function test_get_metadata(): void {
+        $this->resetAfterTest();
+
+        $collection = new collection('local_imisbridge');
+        $result     = provider::get_metadata($collection);
+
+        $this->assertInstanceOf(collection::class, $result);
+
+        $items = $result->get_collection();
+        $this->assertCount(1, $items);
+
+        $link = reset($items);
+        $this->assertSame('imis', $link->get_name());
+        $this->assertArrayHasKey('userid', $link->get_privacy_fields());
     }
 }

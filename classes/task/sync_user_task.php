@@ -15,7 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Scheduled task: sync iMIS enrollments for all users.
+ * Adhoc task: synchronise a single iMIS user off the request path.
+ *
+ * Queued on login so the external SOAP round-trips do not block the user.
  *
  * @package    local_imisbridge
  * @copyright  2024 Vernon Spain
@@ -25,36 +27,42 @@
 namespace local_imisbridge\task;
 
 /**
- * Syncs iMIS enrollments for all Moodle users.
+ * Synchronises one iMIS user's enrolments, cancellations and groups.
  *
  * @package    local_imisbridge
  * @copyright  2024 Vernon Spain
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class sync_enrollments_task extends \core\task\scheduled_task {
+class sync_user_task extends \core\task\adhoc_task {
     /**
      * Returns the task name shown in the Moodle admin UI.
      *
      * @return string
      */
     public function get_name(): string {
-        return get_string('task_sync_enrollments', 'local_imisbridge');
+        return get_string('task_sync_user', 'local_imisbridge');
     }
 
     /**
-     * Executes the enrollment sync for all users (empty contactId = all).
+     * Executes the per-user sync. Exceptions propagate so Moodle retries with backoff.
      *
      * @return void
      */
     public function execute(): void {
-        mtrace('iMIS Bridge: Starting enrollment sync for all users...');
-        try {
-            $client = new \local_imisbridge\imis_client();
-            $result = $client->sync_orders(null);
-            mtrace('iMIS Bridge: Enrollment sync complete. Result: ' . var_export($result, true));
-        } catch (\Exception $e) {
-            mtrace('iMIS Bridge: Enrollment sync FAILED: ' . $e->getMessage());
-            throw $e;
+        $data   = $this->get_custom_data();
+        $imisid = $data->imisid ?? '';
+
+        if (empty($imisid)) {
+            return;
         }
+
+        mtrace('iMIS Bridge: syncing user ' . $imisid . '...');
+
+        $client = new \local_imisbridge\imis_client();
+        $client->sync_orders($imisid);
+        $client->sync_cancelled_orders($imisid);
+        $client->update_groups($imisid);
+
+        mtrace('iMIS Bridge: user sync complete for ' . $imisid . '.');
     }
 }

@@ -38,7 +38,7 @@ class sync_cancellations_task extends \core\task\scheduled_task {
      * @return string
      */
     public function get_name(): string {
-        return 'iMIS Bridge: Sync Cancellations';
+        return get_string('task_sync_cancellations', 'local_imisbridge');
     }
 
     /**
