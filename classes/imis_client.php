@@ -35,6 +35,23 @@ namespace local_imisbridge;
 /**
  * iMIS SOAP client wrapper class.
  *
+ * Public methods map directly to wsmoodle.asmx operations. They form an
+ * intentional, reusable API surface: some are used by the plugin's observers
+ * and tasks today, and the rest are provided for SSO, reporting and other
+ * integrations to build on. Methods marked below inject the ATS AuthToken
+ * automatically (see get_api_auth_token()); the exact SOAP argument names for
+ * each operation come from the live WSDL, so confirm with __getFunctions() /
+ * __getTypes() against the target endpoint when wiring up a new call.
+ *
+ * SSO / session:     get_token, get_service_token, check_authorization
+ * Contact lookup:    get_contact_by_id*, get_contact_by_token*
+ * Enrolment sync:    sync_orders, sync_cancelled_orders
+ * Group sync:        update_groups
+ * Activities:        get_activities*, create_activity*, update_activity_record*
+ * Reporting:         get_iqa_rows*, get_bridge_settings
+ * Encryption:        encrypt, decrypt
+ *   (* injects the ATS API AuthToken automatically.)
+ *
  * @package    local_imisbridge
  * @copyright  2024 Vernon Spain
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
