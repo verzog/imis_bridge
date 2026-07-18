@@ -77,7 +77,10 @@ final class observer_test extends \advanced_testcase {
             'objectid' => $user->id,
             'other'    => ['username' => $user->username],
         ]);
-        $event->trigger();
+
+        // Call the observer directly: non-internal observers are buffered until the
+        // enclosing DB transaction commits, which does not happen within a unit test.
+        observer::user_loggedin($event);
 
         $tasks = \core\task\manager::get_adhoc_tasks(sync_user_task::class);
         $this->assertCount(1, $tasks);
