@@ -84,7 +84,7 @@ class observer {
             $today,
             $today,
             'Pass',
-            0.0
+            self::course_score((int)$course->id, (int)$user->id)
         );
     }
 
@@ -182,6 +182,34 @@ class observer {
             'score'          => $score,
         ]);
         \core\task\manager::queue_adhoc_task($task);
+    }
+
+    /**
+     * The learner's final course grade as a percentage.
+     *
+     * Sent on completion so a completion event firing after a quiz does not
+     * overwrite the recorded score with 0. Returns 0 when the course is not
+     * yet graded or has no gradable content.
+     *
+     * @param int $courseid The Moodle course ID.
+     * @param int $userid   The Moodle user ID.
+     * @return float
+     */
+    private static function course_score(int $courseid, int $userid): float {
+        global $CFG;
+        require_once($CFG->libdir . '/gradelib.php');
+
+        $coursegrades = grade_get_course_grades($courseid, $userid);
+        if (empty($coursegrades) || !isset($coursegrades->grades[$userid])) {
+            return 0.0;
+        }
+
+        $usergrade = $coursegrades->grades[$userid]->grade;
+        if ($usergrade === null || $usergrade === false) {
+            return 0.0;
+        }
+
+        return self::calculate_percentage((float)$usergrade, (float)$coursegrades->grademax);
     }
 
     /**
