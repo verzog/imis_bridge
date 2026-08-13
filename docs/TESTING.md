@@ -23,16 +23,17 @@ iMIS when no staging iMIS is available.
 Do this **first**, before entering any endpoint or token. On a fresh install the
 WSDL setting already defaults to the **production** ATS endpoint, every write
 toggle defaults to enabled (an unset toggle is treated as enabled too), and the
-enrolment/cancellation/group syncs do not use the AuthToken — so a cron run or a
-single user login can trigger an all-user **production** sync before you have
-configured anything.
+enrolment/cancellation/group syncs do not use the AuthToken — so a nightly cron
+run can trigger an **all-user production** sync, and a single user login triggers
+a **production** sync scoped to that one user, before you have configured
+anything.
 
 1. On the test Moodle, **pause Moodle cron** and avoid user logins during setup.
 2. Install the plugin (`git clone` into `local/imisbridge`, then _Site
    administration > Notifications_).
 3. Immediately go to _Site administration > Plugins > Local plugins > iMIS
    Bridge_ and **disable every automatic toggle** (all three login toggles, both
-   push toggles, and all three scheduled-task toggles) — see §4.
+   push toggles, and all three scheduled-task toggles) — see §5.
 
 Only once writes are disabled should you configure the endpoint (§2).
 
@@ -87,6 +88,7 @@ valid. Supply an iMIS contact ID to run an authenticated call.
 | Operation | Trigger | Sends AuthToken? | Effect |
 | --- | --- | --- | --- |
 | `GetBridgeSettings`, `MoodleGetUserProfile`, `getActivityByIDAndType`, `getIQARows` | Connection test / API | Read: some yes | Read only |
+| `createActivity` (`imis_client::create_activity()`) | Client API only — no Moodle event | Yes | Creates a new iMIS activity record. Not wired to any observer, task or button; writes only if called directly through the client API |
 | Completion push (`MoodleUpdate`) | Course completion | Yes | Writes status, score, credit value and the start/completion/grant dates to the iMIS activity record |
 | Quiz push (`MoodleUpdate`) | Graded quiz submission | Yes | Writes score, pass/fail status, credit value and the start/completion/grant dates to the iMIS activity record |
 | Enrolment sync (`SendNewOrdersToMoodle`) | Login, nightly task, manual | No | Creates iMIS activity records **and** pushes an enrol notice to the bridge's configured Moodle |
@@ -146,8 +148,10 @@ merely by running it from a test Moodle.
    these are not interchangeable:
    - **Completion/quiz pushes** are token-bearing, so a **scoped test AuthToken
      / test product** confines them to a throwaway iMIS contact and product.
-     Scope the test to that single contact ID (via the observers or a scoped
-     manual action), verify in iMIS, and delete the test records afterwards.
+     There is no manual push button; trigger the push through the event itself —
+     have your test user (whose username is the throwaway iMIS contact ID)
+     complete the test course or submit the graded quiz. Verify in iMIS, and
+     delete the test records afterwards.
    - **Enrolment / cancellation / group syncs carry no AuthToken**, so a scoped
      token does **not** constrain them. The only safe way to exercise these is a
      **staging or repointed bridge configured to call back your test Moodle**.
