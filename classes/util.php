@@ -15,17 +15,35 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Plugin version information.
+ * Shared helpers for local_imisbridge.
  *
  * @package    local_imisbridge
  * @copyright  2024 Vernon Spain
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
+namespace local_imisbridge;
 
-$plugin->component = 'local_imisbridge';
-$plugin->version   = 2026071702;
-$plugin->requires  = 2025041400; // Moodle 5.0+.
-$plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.3.0';
+/**
+ * Small utility helpers.
+ *
+ * @package    local_imisbridge
+ * @copyright  2024 Vernon Spain
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class util {
+    /**
+     * Whether a sync toggle is enabled.
+     *
+     * Every toggle defaults to on: an unset value (e.g. immediately after an
+     * upgrade, before defaults are written) is treated as enabled so existing
+     * behaviour is preserved. Only an explicit '0' disables the operation.
+     *
+     * @param string $name The plugin config name of the checkbox setting.
+     * @return bool
+     */
+    public static function is_enabled(string $name): bool {
+        $value = get_config('local_imisbridge', $name);
+        return ($value === false) ? true : (bool)$value;
+    }
+}

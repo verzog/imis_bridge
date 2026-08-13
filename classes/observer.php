@@ -50,6 +50,13 @@ class observer {
             return;
         }
 
+        // Nothing to do if every login sync is disabled.
+        if (!util::is_enabled('sync_enrolments_on_login')
+                && !util::is_enabled('sync_cancellations_on_login')
+                && !util::is_enabled('sync_groups_on_login')) {
+            return;
+        }
+
         // Username == iMIS ID via SAML2.
         $task = new task\sync_user_task();
         $task->set_custom_data(['imisid' => $user->username]);
@@ -66,6 +73,10 @@ class observer {
      */
     public static function course_completed(\core\event\course_completed $event): void {
         global $DB;
+
+        if (!util::is_enabled('push_completions')) {
+            return;
+        }
 
         $data   = $event->get_data();
         $user   = $DB->get_record('user', ['id' => $data['relateduserid']], 'id, username');
@@ -98,6 +109,10 @@ class observer {
      */
     public static function quiz_attempt_submitted(\mod_quiz\event\attempt_submitted $event): void {
         global $DB;
+
+        if (!util::is_enabled('push_quiz_scores')) {
+            return;
+        }
 
         $data = $event->get_data();
         $user = $DB->get_record('user', ['id' => $data['userid']], 'id, username');

@@ -47,6 +47,11 @@ class sync_groups_task extends \core\task\scheduled_task {
      * @return void
      */
     public function execute(): void {
+        if (!\local_imisbridge\util::is_enabled('task_groups_enabled')) {
+            mtrace('iMIS Bridge: Group sync task disabled in plugin settings; skipping.');
+            return;
+        }
+
         mtrace('iMIS Bridge: Starting group sync...');
         try {
             $client = new \local_imisbridge\imis_client();

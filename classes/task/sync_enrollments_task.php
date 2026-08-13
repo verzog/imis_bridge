@@ -47,6 +47,11 @@ class sync_enrollments_task extends \core\task\scheduled_task {
      * @return void
      */
     public function execute(): void {
+        if (!\local_imisbridge\util::is_enabled('task_enrolments_enabled')) {
+            mtrace('iMIS Bridge: Enrolment sync task disabled in plugin settings; skipping.');
+            return;
+        }
+
         mtrace('iMIS Bridge: Starting enrollment sync for all users...');
         try {
             $client = new \local_imisbridge\imis_client();
