@@ -36,10 +36,28 @@ $PAGE->set_heading(get_string('manualsynccontrols', 'local_imisbridge'));
 // Use POST to avoid action/contactid appearing in browser history and server logs.
 $action    = optional_param('action', '', PARAM_ALPHANUMEXT);
 $contactid = optional_param('contactid', '', PARAM_TEXT);
-$message   = '';
-$error     = '';
+$message    = '';
+$error      = '';
+$testoutput = '';
 
-if ($action && confirm_sesskey()) {
+if ($action === 'testconnection' && confirm_sesskey()) {
+    // Read-only: verify connectivity without writing any data. GetBridgeSettings is
+    // unauthenticated, so the AuthToken is only exercised when a contact ID is given.
+    try {
+        $client = new \local_imisbridge\imis_client();
+        $out    = 'GetBridgeSettings:' . PHP_EOL . var_export($client->get_bridge_settings(), true);
+        if (!empty($contactid)) {
+            $out .= PHP_EOL . PHP_EOL . 'MoodleGetUserProfile(' . $contactid . '):' . PHP_EOL
+                . var_export($client->get_contact_by_id($contactid), true);
+            $out .= PHP_EOL . PHP_EOL . get_string('testcredentialsok', 'local_imisbridge');
+        } else {
+            $out .= PHP_EOL . PHP_EOL . get_string('testcredentialsnote', 'local_imisbridge');
+        }
+        $testoutput = $out;
+    } catch (\Throwable $e) {
+        $error = get_string('syncfailed', 'local_imisbridge', $e->getMessage());
+    }
+} else if ($action && confirm_sesskey()) {
     // A full all-user sync can be slow; give it room beyond the default web limit.
     \core_php_time_limit::raise(300);
 
@@ -113,10 +131,22 @@ echo '<button type="submit" name="action" value="groups" class="btn btn-info">'
     . s(get_string('sync_groups', 'local_imisbridge')) . '</button>';
 echo '<button type="submit" name="action" value="all" class="btn btn-success">'
     . s(get_string('sync_all', 'local_imisbridge')) . '</button>';
+echo '<button type="submit" name="action" value="testconnection" class="btn btn-outline-secondary">'
+    . s(get_string('testconnection', 'local_imisbridge')) . '</button>';
 echo html_writer::end_div();
+echo html_writer::tag('small', get_string('testconnection_help', 'local_imisbridge'), ['class' => 'form-text text-muted mt-2']);
 echo '</form>';
 echo html_writer::end_div();
 echo html_writer::end_div();
+
+if ($testoutput !== '') {
+    echo html_writer::start_div('card mb-4');
+    echo html_writer::start_div('card-body');
+    echo html_writer::tag('h5', get_string('testconnection', 'local_imisbridge'), ['class' => 'card-title']);
+    echo html_writer::tag('pre', s($testoutput), ['class' => 'bg-light p-3']);
+    echo html_writer::end_div();
+    echo html_writer::end_div();
+}
 
 echo html_writer::start_div('card');
 echo html_writer::start_div('card-body');

@@ -56,12 +56,30 @@ class sync_user_task extends \core\task\adhoc_task {
             return;
         }
 
+        $enrolments = \local_imisbridge\util::is_enabled('sync_enrolments_on_login');
+        $cancellations = \local_imisbridge\util::is_enabled('sync_cancellations_on_login');
+        $groups = \local_imisbridge\util::is_enabled('sync_groups_on_login');
+
+        // Return before touching the network if every login sync was disabled
+        // after this task was queued: constructing the client fetches the WSDL.
+        if (!$enrolments && !$cancellations && !$groups) {
+            mtrace('iMIS Bridge: all login syncs disabled; skipping ' . $imisid . '.');
+            return;
+        }
+
         mtrace('iMIS Bridge: syncing user ' . $imisid . '...');
 
         $client = new \local_imisbridge\imis_client();
-        $client->sync_orders($imisid);
-        $client->sync_cancelled_orders($imisid);
-        $client->update_groups($imisid);
+
+        if ($enrolments) {
+            $client->sync_orders($imisid);
+        }
+        if ($cancellations) {
+            $client->sync_cancelled_orders($imisid);
+        }
+        if ($groups) {
+            $client->update_groups($imisid);
+        }
 
         mtrace('iMIS Bridge: user sync complete for ' . $imisid . '.');
     }

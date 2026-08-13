@@ -47,17 +47,30 @@ class sync_groups_task extends \core\task\scheduled_task {
      * @return void
      */
     public function execute(): void {
+        if (!\local_imisbridge\util::is_enabled('task_groups_enabled')) {
+            mtrace('iMIS Bridge: Group sync task disabled in plugin settings; skipping.');
+            return;
+        }
+
         mtrace('iMIS Bridge: Starting group sync...');
         try {
             $client = new \local_imisbridge\imis_client();
 
-            // Only sync groups changed since the last time this task ran.
-            // get_last_run_time() returns a Unix timestamp; convert to UTC string.
-            // Null means sync everything (first run).
-            $lastrun     = $this->get_last_run_time();
-            $lastupdated = $lastrun ? gmdate('Y-m-d\TH:i:s', $lastrun) : null;
+            // Incremental sync uses a watermark this task manages itself, rather than
+            // the scheduled-task last-run time. A disabled run returns early without
+            // advancing it, so re-enabling the task does not skip changes made while
+            // it was off. Null means sync everything (first run).
+            $lastsync    = get_config('local_imisbridge', 'groups_last_sync');
+            $lastupdated = !empty($lastsync) ? gmdate('Y-m-d\TH:i:s', (int)$lastsync) : null;
+
+            // Stamp the window start before the call so changes made during the sync
+            // are re-checked next time (a safe overlap) rather than missed.
+            $windowstart = time();
 
             $result = $client->update_groups(null, null, $lastupdated);
+
+            // Advance the watermark only after a successful sync.
+            set_config('groups_last_sync', $windowstart, 'local_imisbridge');
             mtrace('iMIS Bridge: Group sync complete. Result: ' . var_export($result, true));
         } catch (\Exception $e) {
             mtrace('iMIS Bridge: Group sync FAILED: ' . $e->getMessage());

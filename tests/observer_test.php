@@ -86,4 +86,29 @@ final class observer_test extends \advanced_testcase {
         $this->assertCount(1, $tasks);
         $this->assertSame('member123', reset($tasks)->get_custom_data()->imisid);
     }
+
+    /**
+     * With all login syncs disabled, no task is queued.
+     *
+     * @return void
+     */
+    public function test_user_loggedin_respects_disabled_toggles(): void {
+        $this->resetAfterTest();
+
+        set_config('sync_enrolments_on_login', '0', 'local_imisbridge');
+        set_config('sync_cancellations_on_login', '0', 'local_imisbridge');
+        set_config('sync_groups_on_login', '0', 'local_imisbridge');
+
+        $user = $this->getDataGenerator()->create_user(['username' => 'member123']);
+
+        $event = \core\event\user_loggedin::create([
+            'userid'   => $user->id,
+            'objectid' => $user->id,
+            'other'    => ['username' => $user->username],
+        ]);
+        observer::user_loggedin($event);
+
+        $tasks = \core\task\manager::get_adhoc_tasks(sync_user_task::class);
+        $this->assertCount(0, $tasks);
+    }
 }

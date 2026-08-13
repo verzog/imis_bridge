@@ -56,6 +56,13 @@ class push_activity_task extends \core\task\adhoc_task {
             return;
         }
 
+        // Re-check the governing write toggle: an admin may have disabled it after
+        // this task was queued but before cron reached it.
+        if (!empty($data->toggle) && !\local_imisbridge\util::is_enabled($data->toggle)) {
+            mtrace('iMIS Bridge: activity push disabled in plugin settings; skipping ' . $data->imisid . '.');
+            return;
+        }
+
         mtrace('iMIS Bridge: pushing activity record for ' . $data->imisid . '...');
 
         $client = new \local_imisbridge\imis_client();

@@ -83,6 +83,76 @@ if ($hassiteconfig) {
         PARAM_ALPHANUMEXT
     ));
 
+    // Automatic sync controls — toggle each automatic write to iMIS.
+    $settings->add(new admin_setting_heading(
+        'local_imisbridge/autosynccontrols',
+        get_string('autosynccontrols', 'local_imisbridge'),
+        get_string('autosynccontrols_desc', 'local_imisbridge')
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_imisbridge/sync_enrolments_on_login',
+        get_string('sync_enrolments_on_login', 'local_imisbridge'),
+        get_string('sync_enrolments_on_login_desc', 'local_imisbridge'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_imisbridge/sync_cancellations_on_login',
+        get_string('sync_cancellations_on_login', 'local_imisbridge'),
+        get_string('sync_cancellations_on_login_desc', 'local_imisbridge'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_imisbridge/sync_groups_on_login',
+        get_string('sync_groups_on_login', 'local_imisbridge'),
+        get_string('sync_groups_on_login_desc', 'local_imisbridge'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_imisbridge/push_completions',
+        get_string('push_completions', 'local_imisbridge'),
+        get_string('push_completions_desc', 'local_imisbridge'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_imisbridge/push_quiz_scores',
+        get_string('push_quiz_scores', 'local_imisbridge'),
+        get_string('push_quiz_scores_desc', 'local_imisbridge'),
+        1
+    ));
+
+    // Scheduled task controls — toggle each nightly all-user task.
+    $settings->add(new admin_setting_heading(
+        'local_imisbridge/scheduledtaskcontrols',
+        get_string('scheduledtaskcontrols', 'local_imisbridge'),
+        get_string('scheduledtaskcontrols_desc', 'local_imisbridge')
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_imisbridge/task_enrolments_enabled',
+        get_string('task_enrolments_enabled', 'local_imisbridge'),
+        get_string('task_enrolments_enabled_desc', 'local_imisbridge'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_imisbridge/task_cancellations_enabled',
+        get_string('task_cancellations_enabled', 'local_imisbridge'),
+        get_string('task_cancellations_enabled_desc', 'local_imisbridge'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_imisbridge/task_groups_enabled',
+        get_string('task_groups_enabled', 'local_imisbridge'),
+        get_string('task_groups_enabled_desc', 'local_imisbridge'),
+        1
+    ));
+
     // Manual sync controls — link to admin tool page.
     $settings->add(new admin_setting_heading(
         'local_imisbridge/manual_sync_heading',

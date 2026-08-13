@@ -50,6 +50,15 @@ class observer {
             return;
         }
 
+        // Nothing to do if every login sync is disabled.
+        if (
+            !util::is_enabled('sync_enrolments_on_login')
+            && !util::is_enabled('sync_cancellations_on_login')
+            && !util::is_enabled('sync_groups_on_login')
+        ) {
+            return;
+        }
+
         // Username == iMIS ID via SAML2.
         $task = new task\sync_user_task();
         $task->set_custom_data(['imisid' => $user->username]);
@@ -67,6 +76,10 @@ class observer {
     public static function course_completed(\core\event\course_completed $event): void {
         global $DB;
 
+        if (!util::is_enabled('push_completions')) {
+            return;
+        }
+
         $data   = $event->get_data();
         $user   = $DB->get_record('user', ['id' => $data['relateduserid']], 'id, username');
         $course = $DB->get_record('course', ['id' => $data['courseid']], 'id, idnumber, shortname');
@@ -77,6 +90,7 @@ class observer {
 
         $today = date('Y-m-d');
         self::queue_activity_push(
+            'push_completions',
             $user->username,
             self::course_number($course),
             self::course_credit_value((int)$course->id),
@@ -98,6 +112,10 @@ class observer {
      */
     public static function quiz_attempt_submitted(\mod_quiz\event\attempt_submitted $event): void {
         global $DB;
+
+        if (!util::is_enabled('push_quiz_scores')) {
+            return;
+        }
 
         $data = $event->get_data();
         $user = $DB->get_record('user', ['id' => $data['userid']], 'id, username');
@@ -130,6 +148,7 @@ class observer {
         $start    = !empty($attempt->timestart) ? date('Y-m-d', $attempt->timestart) : date('Y-m-d');
 
         self::queue_activity_push(
+            'push_quiz_scores',
             $user->username,
             self::course_number($course),
             self::course_credit_value((int)$course->id),
@@ -144,6 +163,7 @@ class observer {
     /**
      * Queue an activity-record push to iMIS.
      *
+     * @param string $toggle         Config name of the write toggle governing this push.
      * @param string $imisid         iMIS user ID (= Moodle username).
      * @param string $coursenum      Moodle course number (maps to iMIS product code).
      * @param float  $creditvalue    Number of credit hours awarded.
@@ -155,6 +175,7 @@ class observer {
      * @return void
      */
     private static function queue_activity_push(
+        string $toggle,
         string $imisid,
         string $coursenum,
         float $creditvalue,
@@ -171,6 +192,7 @@ class observer {
 
         $task = new task\push_activity_task();
         $task->set_custom_data([
+            'toggle'         => $toggle,
             'imisid'         => $imisid,
             'coursenum'      => $coursenum,
             'credittype'     => $credittype,

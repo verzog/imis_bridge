@@ -43,14 +43,24 @@ namespace local_imisbridge;
  * each operation come from the live WSDL, so confirm with __getFunctions() /
  * __getTypes() against the target endpoint when wiring up a new call.
  *
- * SSO / session:     get_token, get_service_token, check_authorization
- * Contact lookup:    get_contact_by_id*, get_contact_by_token*
- * Enrolment sync:    sync_orders, sync_cancelled_orders
- * Group sync:        update_groups
- * Activities:        get_activities*, create_activity*, update_activity_record*
- * Reporting:         get_iqa_rows*, get_bridge_settings
- * Encryption:        encrypt, decrypt
+ * Exposed by wsmoodle.asmx (confirmed against the service operation list):
+ *   Bridge config:  get_bridge_settings (GetBridgeSettings)
+ *   Contact lookup: get_contact_by_id* (MoodleGetUserProfile),
+ *                   get_contact_by_token* (MoodleGetUserProfileByToken)
+ *   Enrolment sync: sync_orders (SendNewOrdersToMoodle),
+ *                   sync_cancelled_orders (SendCancelledOrdersToMoodle)
+ *   Group sync:     update_groups (UpdateMoodleGroups)
+ *   Activities:     get_activities* (getActivityByIDAndType),
+ *                   create_activity* (createActivity),
+ *                   update_activity_record* (MoodleUpdate)
+ *   Reporting:      get_iqa_rows* (getIQARows)
  *   (* injects the ATS API AuthToken automatically.)
+ *
+ * NOT advertised by wsmoodle.asmx — do NOT rely on these without confirming with
+ * ATS first: get_token / get_service_token (getToken), check_authorization
+ * (checkAuthorization), encrypt / decrypt (asiEncrypt / asiDecrypt). ATS docs
+ * imply the token flow lives on the REST bridge, not this SOAP endpoint; these
+ * methods are retained for that path but will fault against this service.
  *
  * @package    local_imisbridge
  * @copyright  2024 Vernon Spain
@@ -335,8 +345,9 @@ class imis_client {
      * @return mixed The SOAP result.
      */
     public function get_bridge_settings(): mixed {
-        $result = $this->soap->getBridgeSettings([]);
-        return $result->getBridgeSettingsResult ?? null;
+        // Operation name is case-sensitive: the service advertises GetBridgeSettings.
+        $result = $this->soap->GetBridgeSettings([]);
+        return $result->GetBridgeSettingsResult ?? null;
     }
 
     // IQA.
