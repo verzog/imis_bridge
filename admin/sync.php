@@ -41,13 +41,17 @@ $error      = '';
 $testoutput = '';
 
 if ($action === 'testconnection' && confirm_sesskey()) {
-    // Read-only: verify connectivity and credentials without writing any data.
+    // Read-only: verify connectivity without writing any data. GetBridgeSettings is
+    // unauthenticated, so the AuthToken is only exercised when a contact ID is given.
     try {
         $client = new \local_imisbridge\imis_client();
         $out    = 'GetBridgeSettings:' . PHP_EOL . var_export($client->get_bridge_settings(), true);
         if (!empty($contactid)) {
             $out .= PHP_EOL . PHP_EOL . 'MoodleGetUserProfile(' . $contactid . '):' . PHP_EOL
                 . var_export($client->get_contact_by_id($contactid), true);
+            $out .= PHP_EOL . PHP_EOL . get_string('testcredentialsok', 'local_imisbridge');
+        } else {
+            $out .= PHP_EOL . PHP_EOL . get_string('testcredentialsnote', 'local_imisbridge');
         }
         $testoutput = $out;
     } catch (\Throwable $e) {
@@ -130,8 +134,7 @@ echo '<button type="submit" name="action" value="all" class="btn btn-success">'
 echo '<button type="submit" name="action" value="testconnection" class="btn btn-outline-secondary">'
     . s(get_string('testconnection', 'local_imisbridge')) . '</button>';
 echo html_writer::end_div();
-echo html_writer::tag('small', get_string('testconnection_help', 'local_imisbridge'),
-    ['class' => 'form-text text-muted mt-2']);
+echo html_writer::tag('small', get_string('testconnection_help', 'local_imisbridge'), ['class' => 'form-text text-muted mt-2']);
 echo '</form>';
 echo html_writer::end_div();
 echo html_writer::end_div();

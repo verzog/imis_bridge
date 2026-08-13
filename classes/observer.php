@@ -51,9 +51,11 @@ class observer {
         }
 
         // Nothing to do if every login sync is disabled.
-        if (!util::is_enabled('sync_enrolments_on_login')
-                && !util::is_enabled('sync_cancellations_on_login')
-                && !util::is_enabled('sync_groups_on_login')) {
+        if (
+            !util::is_enabled('sync_enrolments_on_login')
+            && !util::is_enabled('sync_cancellations_on_login')
+            && !util::is_enabled('sync_groups_on_login')
+        ) {
             return;
         }
 
@@ -88,6 +90,7 @@ class observer {
 
         $today = date('Y-m-d');
         self::queue_activity_push(
+            'push_completions',
             $user->username,
             self::course_number($course),
             self::course_credit_value((int)$course->id),
@@ -145,6 +148,7 @@ class observer {
         $start    = !empty($attempt->timestart) ? date('Y-m-d', $attempt->timestart) : date('Y-m-d');
 
         self::queue_activity_push(
+            'push_quiz_scores',
             $user->username,
             self::course_number($course),
             self::course_credit_value((int)$course->id),
@@ -159,6 +163,7 @@ class observer {
     /**
      * Queue an activity-record push to iMIS.
      *
+     * @param string $toggle         Config name of the write toggle governing this push.
      * @param string $imisid         iMIS user ID (= Moodle username).
      * @param string $coursenum      Moodle course number (maps to iMIS product code).
      * @param float  $creditvalue    Number of credit hours awarded.
@@ -170,6 +175,7 @@ class observer {
      * @return void
      */
     private static function queue_activity_push(
+        string $toggle,
         string $imisid,
         string $coursenum,
         float $creditvalue,
@@ -186,6 +192,7 @@ class observer {
 
         $task = new task\push_activity_task();
         $task->set_custom_data([
+            'toggle'         => $toggle,
             'imisid'         => $imisid,
             'coursenum'      => $coursenum,
             'credittype'     => $credittype,
