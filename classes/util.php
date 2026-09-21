@@ -72,4 +72,16 @@ class util {
         $field = self::imis_id_source();
         return isset($user->{$field}) ? trim((string)$user->{$field}) : '';
     }
+
+    /**
+     * Whether the plugin has the minimum configuration to talk to iMIS.
+     *
+     * The SOAP client cannot be built without a WSDL URL, so automatic writes
+     * skip cleanly (rather than throwing in cron) until one is configured.
+     *
+     * @return bool
+     */
+    public static function is_configured(): bool {
+        return !empty(get_config('local_imisbridge', 'wsdl_url'));
+    }
 }

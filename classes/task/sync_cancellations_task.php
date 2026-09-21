@@ -52,6 +52,11 @@ class sync_cancellations_task extends \core\task\scheduled_task {
             return;
         }
 
+        if (!\local_imisbridge\util::is_configured()) {
+            mtrace('iMIS Bridge: no iMIS WSDL configured; skipping cancellation sync.');
+            return;
+        }
+
         mtrace('iMIS Bridge: Starting cancellation sync for all users...');
         try {
             $client = new \local_imisbridge\imis_client();

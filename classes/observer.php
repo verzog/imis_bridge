@@ -45,6 +45,11 @@ class observer {
     public static function user_loggedin(\core\event\user_loggedin $event): void {
         global $DB;
 
+        // No WSDL configured means no client can be built; skip rather than queue a failing task.
+        if (!util::is_configured()) {
+            return;
+        }
+
         $user = $DB->get_record('user', ['id' => $event->userid], 'id, username, idnumber, email');
         if (empty($user)) {
             return;
@@ -82,6 +87,10 @@ class observer {
         global $DB;
 
         if (!util::is_enabled('push_completions')) {
+            return;
+        }
+
+        if (!util::is_configured()) {
             return;
         }
 
@@ -124,6 +133,10 @@ class observer {
         global $DB;
 
         if (!util::is_enabled('push_quiz_scores')) {
+            return;
+        }
+
+        if (!util::is_configured()) {
             return;
         }
 

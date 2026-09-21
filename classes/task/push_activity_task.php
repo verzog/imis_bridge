@@ -63,6 +63,11 @@ class push_activity_task extends \core\task\adhoc_task {
             return;
         }
 
+        if (!\local_imisbridge\util::is_configured()) {
+            mtrace('iMIS Bridge: no iMIS WSDL configured; skipping ' . $data->imisid . '.');
+            return;
+        }
+
         mtrace('iMIS Bridge: pushing activity record for ' . $data->imisid . '...');
 
         $client = new \local_imisbridge\imis_client();

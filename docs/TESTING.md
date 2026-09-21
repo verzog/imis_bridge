@@ -150,9 +150,12 @@ merely by running it from a test Moodle.
    - **Completion/quiz pushes** are token-bearing, so a **scoped test AuthToken
      / test product** confines them to a throwaway iMIS contact and product.
      There is no manual push button; trigger the push through the event itself —
-     have your test user (whose username is the throwaway iMIS contact ID)
-     complete the test course or submit the graded quiz. Verify in iMIS, and
-     delete the test records afterwards.
+     have your test user complete the test course or submit the graded quiz. The
+     push sends the user's **configured iMIS ID field** (_iMIS contact ID source_:
+     username, ID number, or email), so set **that field** — not necessarily the
+     username — on the test user to the throwaway iMIS contact ID, and confirm it
+     before triggering; otherwise the push can hit the user's real production
+     contact. Verify in iMIS, and delete the test records afterwards.
    - **Enrolment / cancellation / group syncs carry no AuthToken**, so a scoped
      token does **not** constrain them. The only safe way to exercise these is a
      **staging or repointed bridge configured to call back your test Moodle**.

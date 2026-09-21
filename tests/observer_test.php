@@ -69,6 +69,8 @@ final class observer_test extends \advanced_testcase {
     public function test_user_loggedin_queues_sync_task(): void {
         $this->resetAfterTest();
 
+        set_config('wsdl_url', 'https://example.invalid/wsmoodle.asmx?WSDL', 'local_imisbridge');
+
         // Moodle stores usernames in lower case; the iMIS ID mirrors the username.
         $user = $this->getDataGenerator()->create_user(['username' => 'member123']);
 
@@ -95,6 +97,7 @@ final class observer_test extends \advanced_testcase {
     public function test_user_loggedin_uses_configured_id_source(): void {
         $this->resetAfterTest();
 
+        set_config('wsdl_url', 'https://example.invalid/wsmoodle.asmx?WSDL', 'local_imisbridge');
         set_config('imis_id_source', 'idnumber', 'local_imisbridge');
 
         $user = $this->getDataGenerator()->create_user([
@@ -122,9 +125,31 @@ final class observer_test extends \advanced_testcase {
     public function test_user_loggedin_skips_when_id_field_empty(): void {
         $this->resetAfterTest();
 
+        set_config('wsdl_url', 'https://example.invalid/wsmoodle.asmx?WSDL', 'local_imisbridge');
         // Generated users have an empty idnumber by default.
         set_config('imis_id_source', 'idnumber', 'local_imisbridge');
 
+        $user = $this->getDataGenerator()->create_user(['username' => 'member123']);
+
+        $event = \core\event\user_loggedin::create([
+            'userid'   => $user->id,
+            'objectid' => $user->id,
+            'other'    => ['username' => $user->username],
+        ]);
+        observer::user_loggedin($event);
+
+        $this->assertCount(0, \core\task\manager::get_adhoc_tasks(sync_user_task::class));
+    }
+
+    /**
+     * With no WSDL configured, login queues no task (a clean no-op, not an error).
+     *
+     * @return void
+     */
+    public function test_user_loggedin_skips_when_unconfigured(): void {
+        $this->resetAfterTest();
+
+        // No wsdl_url set: the client cannot be built, so nothing should be queued.
         $user = $this->getDataGenerator()->create_user(['username' => 'member123']);
 
         $event = \core\event\user_loggedin::create([
@@ -145,6 +170,7 @@ final class observer_test extends \advanced_testcase {
     public function test_user_loggedin_respects_disabled_toggles(): void {
         $this->resetAfterTest();
 
+        set_config('wsdl_url', 'https://example.invalid/wsmoodle.asmx?WSDL', 'local_imisbridge');
         set_config('sync_enrolments_on_login', '0', 'local_imisbridge');
         set_config('sync_cancellations_on_login', '0', 'local_imisbridge');
         set_config('sync_groups_on_login', '0', 'local_imisbridge');
