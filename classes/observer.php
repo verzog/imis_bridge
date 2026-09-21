@@ -45,8 +45,14 @@ class observer {
     public static function user_loggedin(\core\event\user_loggedin $event): void {
         global $DB;
 
-        $user = $DB->get_record('user', ['id' => $event->userid], 'id, username');
-        if (empty($user) || empty($user->username)) {
+        $user = $DB->get_record('user', ['id' => $event->userid], 'id, username, idnumber, email');
+        if (empty($user)) {
+            return;
+        }
+
+        // Resolve the iMIS contact ID from the configured user field (default username).
+        $imisid = util::get_imis_id($user);
+        if ($imisid === '') {
             return;
         }
 
@@ -59,9 +65,8 @@ class observer {
             return;
         }
 
-        // Username == iMIS ID via SAML2.
         $task = new task\sync_user_task();
-        $task->set_custom_data(['imisid' => $user->username]);
+        $task->set_custom_data(['imisid' => $imisid]);
 
         // Collapse repeat logins into a single queued sync.
         \core\task\manager::queue_adhoc_task($task, true);
@@ -81,17 +86,22 @@ class observer {
         }
 
         $data   = $event->get_data();
-        $user   = $DB->get_record('user', ['id' => $data['relateduserid']], 'id, username');
+        $user   = $DB->get_record('user', ['id' => $data['relateduserid']], 'id, username, idnumber, email');
         $course = $DB->get_record('course', ['id' => $data['courseid']], 'id, idnumber, shortname');
 
-        if (empty($user) || empty($user->username) || empty($course)) {
+        if (empty($user) || empty($course)) {
+            return;
+        }
+
+        $imisid = util::get_imis_id($user);
+        if ($imisid === '') {
             return;
         }
 
         $today = date('Y-m-d');
         self::queue_activity_push(
             'push_completions',
-            $user->username,
+            $imisid,
             self::course_number($course),
             self::course_credit_value((int)$course->id),
             $today,
@@ -118,8 +128,13 @@ class observer {
         }
 
         $data = $event->get_data();
-        $user = $DB->get_record('user', ['id' => $data['userid']], 'id, username');
-        if (empty($user) || empty($user->username)) {
+        $user = $DB->get_record('user', ['id' => $data['userid']], 'id, username, idnumber, email');
+        if (empty($user)) {
+            return;
+        }
+
+        $imisid = util::get_imis_id($user);
+        if ($imisid === '') {
             return;
         }
 
@@ -149,7 +164,7 @@ class observer {
 
         self::queue_activity_push(
             'push_quiz_scores',
-            $user->username,
+            $imisid,
             self::course_number($course),
             self::course_credit_value((int)$course->id),
             $start,
@@ -164,7 +179,7 @@ class observer {
      * Queue an activity-record push to iMIS.
      *
      * @param string $toggle         Config name of the write toggle governing this push.
-     * @param string $imisid         iMIS user ID (= Moodle username).
+     * @param string $imisid         iMIS contact ID (from the configured Moodle user field).
      * @param string $coursenum      Moodle course number (maps to iMIS product code).
      * @param float  $creditvalue    Number of credit hours awarded.
      * @param string $startdate      Course start date (Y-m-d).

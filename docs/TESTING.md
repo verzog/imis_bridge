@@ -11,12 +11,13 @@ iMIS when no staging iMIS is available.
   `\SoapClient`; without it every path fails with a missing-class error.
 - Network access from the Moodle server to the ATS bridge WSDL endpoint.
 - An ATS-issued API AuthToken (format `MO-xxxxxx`) for the secured methods.
-- **Username = iMIS contact ID.** Every event-driven operation — login sync,
-  course-completion push, and quiz push — sends the Moodle username directly as
-  the iMIS contact ID (`UserID` for `MoodleUpdate`). This is normally set by
-  SAML2. For manual testing, create Moodle test users whose usernames are valid
-  iMIS contact IDs. A username that coincidentally matches an unrelated iMIS ID
-  will update the **wrong** contact.
+- **iMIS contact ID source.** Every event-driven operation — login sync,
+  course-completion push, and quiz push — sends a Moodle user field directly as
+  the iMIS contact ID (`UserID` for `MoodleUpdate`). The field is configurable
+  (_iMIS contact ID source_: username, ID number, or email; default **username**)
+  and is normally populated by SAML2. For manual testing, create Moodle test
+  users whose configured field holds valid iMIS contact IDs. A value that
+  coincidentally matches an unrelated iMIS ID will update the **wrong** contact.
 
 ## 1. Lock the plugin down before connecting it
 

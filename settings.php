@@ -34,7 +34,7 @@ if ($hassiteconfig) {
         'local_imisbridge/wsdl_url',
         get_string('imis_wsdl_url', 'local_imisbridge'),
         get_string('imis_wsdl_url_desc', 'local_imisbridge'),
-        'https://scca.atsservices.net/wsmoodle.asmx?WSDL',
+        '',
         PARAM_URL
     ));
 
@@ -54,6 +54,19 @@ if ($hassiteconfig) {
         get_string('imis_auth_token_desc', 'local_imisbridge'),
         '',
         PARAM_TEXT
+    ));
+
+    // Which Moodle user field holds the iMIS contact ID sent to iMIS.
+    $settings->add(new admin_setting_configselect(
+        'local_imisbridge/imis_id_source',
+        get_string('imis_id_source', 'local_imisbridge'),
+        get_string('imis_id_source_desc', 'local_imisbridge'),
+        'username',
+        [
+            'username' => get_string('imis_id_source_username', 'local_imisbridge'),
+            'idnumber' => get_string('imis_id_source_idnumber', 'local_imisbridge'),
+            'email'    => get_string('imis_id_source_email', 'local_imisbridge'),
+        ]
     ));
 
     // Web service timeout (seconds) for calls to iMIS.

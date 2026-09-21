@@ -50,4 +50,51 @@ final class util_test extends \advanced_testcase {
         set_config('push_completions', '1', 'local_imisbridge');
         $this->assertTrue(util::is_enabled('push_completions'));
     }
+
+    /**
+     * The iMIS ID source defaults to username and rejects unknown values.
+     *
+     * @return void
+     */
+    public function test_imis_id_source(): void {
+        $this->resetAfterTest();
+
+        // Unset defaults to username so existing installs are unchanged.
+        $this->assertSame('username', util::imis_id_source());
+
+        set_config('imis_id_source', 'idnumber', 'local_imisbridge');
+        $this->assertSame('idnumber', util::imis_id_source());
+
+        set_config('imis_id_source', 'email', 'local_imisbridge');
+        $this->assertSame('email', util::imis_id_source());
+
+        // An unrecognised value falls back to username.
+        set_config('imis_id_source', 'bogus', 'local_imisbridge');
+        $this->assertSame('username', util::imis_id_source());
+    }
+
+    /**
+     * The iMIS ID is read from the configured user field, trimmed, or '' when empty.
+     *
+     * @return void
+     */
+    public function test_get_imis_id(): void {
+        $this->resetAfterTest();
+
+        $user = (object)['username' => 'member123', 'idnumber' => 'IM-9', 'email' => 'a@b.test'];
+
+        // Default source is username.
+        $this->assertSame('member123', util::get_imis_id($user));
+
+        set_config('imis_id_source', 'idnumber', 'local_imisbridge');
+        $this->assertSame('IM-9', util::get_imis_id($user));
+
+        set_config('imis_id_source', 'email', 'local_imisbridge');
+        $this->assertSame('a@b.test', util::get_imis_id($user));
+
+        // Empty configured field yields an empty string.
+        set_config('imis_id_source', 'idnumber', 'local_imisbridge');
+        $this->assertSame('', util::get_imis_id((object)['idnumber' => '   ']));
+        $this->assertSame('', util::get_imis_id((object)['username' => 'x']));
+    }
 }

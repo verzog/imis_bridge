@@ -51,9 +51,14 @@ to complete the installation from the command line.
 After installation, configure the plugin under _Site administration > Plugins >
 Local plugins > iMIS Bridge_:
 
-* **iMIS WSDL URL** — the `wsmoodle.asmx?WSDL` endpoint.
+* **iMIS WSDL URL** — the `wsmoodle.asmx?WSDL` endpoint for your environment
+  (ask ATS for the correct host). No sync or connection test runs until this is
+  set.
 * **ATS API AuthToken** — the `MO-xxxxxx` token issued by ATS.
 * **Admin iMIS ID** — used to generate a service-level SSO session token.
+* **iMIS contact ID source** — the Moodle user field that holds the iMIS contact
+  ID (username, ID number, or email). Set this to whichever field your identity
+  provider populates with the iMIS ID. Defaults to username.
 * **Web service timeout** — how long to wait on iMIS before giving up.
 * **Default credit type** and **Credit value course field** — control the credit
   hours recorded against iMIS activity records.

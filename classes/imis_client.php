@@ -299,7 +299,7 @@ class imis_client {
      *
      * Requires AuthToken as of 2025 ATS security update.
      *
-     * @param string $imisid          iMIS user ID (= Moodle username).
+     * @param string $imisid          iMIS contact ID (from the configured Moodle user field).
      * @param string $moodlecoursenum Moodle course number (maps to iMIS product code).
      * @param string $credittype      Type of credit hour.
      * @param float  $creditvalue     Number of credit hours awarded.

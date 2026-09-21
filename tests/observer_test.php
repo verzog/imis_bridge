@@ -88,6 +88,56 @@ final class observer_test extends \advanced_testcase {
     }
 
     /**
+     * When configured to use the ID number field, that value is queued as the iMIS ID.
+     *
+     * @return void
+     */
+    public function test_user_loggedin_uses_configured_id_source(): void {
+        $this->resetAfterTest();
+
+        set_config('imis_id_source', 'idnumber', 'local_imisbridge');
+
+        $user = $this->getDataGenerator()->create_user([
+            'username' => 'member123',
+            'idnumber' => 'IM-4242',
+        ]);
+
+        $event = \core\event\user_loggedin::create([
+            'userid'   => $user->id,
+            'objectid' => $user->id,
+            'other'    => ['username' => $user->username],
+        ]);
+        observer::user_loggedin($event);
+
+        $tasks = \core\task\manager::get_adhoc_tasks(sync_user_task::class);
+        $this->assertCount(1, $tasks);
+        $this->assertSame('IM-4242', reset($tasks)->get_custom_data()->imisid);
+    }
+
+    /**
+     * A user with no value in the configured ID field queues no task.
+     *
+     * @return void
+     */
+    public function test_user_loggedin_skips_when_id_field_empty(): void {
+        $this->resetAfterTest();
+
+        // idnumber defaults to empty for generated users.
+        set_config('imis_id_source', 'idnumber', 'local_imisbridge');
+
+        $user = $this->getDataGenerator()->create_user(['username' => 'member123']);
+
+        $event = \core\event\user_loggedin::create([
+            'userid'   => $user->id,
+            'objectid' => $user->id,
+            'other'    => ['username' => $user->username],
+        ]);
+        observer::user_loggedin($event);
+
+        $this->assertCount(0, \core\task\manager::get_adhoc_tasks(sync_user_task::class));
+    }
+
+    /**
      * With all login syncs disabled, no task is queued.
      *
      * @return void

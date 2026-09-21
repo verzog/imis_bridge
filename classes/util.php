@@ -46,4 +46,30 @@ class util {
         $value = get_config('local_imisbridge', $name);
         return ($value === false) ? true : (bool)$value;
     }
+
+    /**
+     * The Moodle user field configured as the source of the iMIS contact ID.
+     *
+     * Defaults to 'username' so existing installations keep their behaviour.
+     * Only 'username', 'idnumber' and 'email' are valid; anything else (including
+     * an unset value) falls back to 'username'.
+     *
+     * @return string One of 'username', 'idnumber' or 'email'.
+     */
+    public static function imis_id_source(): string {
+        $source = get_config('local_imisbridge', 'imis_id_source');
+        $allowed = ['username', 'idnumber', 'email'];
+        return in_array($source, $allowed, true) ? $source : 'username';
+    }
+
+    /**
+     * Resolve the iMIS contact ID for a user from the configured source field.
+     *
+     * @param \stdClass $user A user record carrying at least the configured field.
+     * @return string The iMIS contact ID, or '' when the field is empty or absent.
+     */
+    public static function get_imis_id(\stdClass $user): string {
+        $field = self::imis_id_source();
+        return isset($user->{$field}) ? trim((string)$user->{$field}) : '';
+    }
 }
