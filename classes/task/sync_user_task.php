@@ -56,6 +56,11 @@ class sync_user_task extends \core\task\adhoc_task {
             return;
         }
 
+        if (!\local_imisbridge\util::is_configured()) {
+            mtrace('iMIS Bridge: no iMIS WSDL configured; skipping ' . $imisid . '.');
+            return;
+        }
+
         $enrolments = \local_imisbridge\util::is_enabled('sync_enrolments_on_login');
         $cancellations = \local_imisbridge\util::is_enabled('sync_cancellations_on_login');
         $groups = \local_imisbridge\util::is_enabled('sync_groups_on_login');

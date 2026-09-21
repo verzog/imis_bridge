@@ -52,6 +52,11 @@ class sync_groups_task extends \core\task\scheduled_task {
             return;
         }
 
+        if (!\local_imisbridge\util::is_configured()) {
+            mtrace('iMIS Bridge: no iMIS WSDL configured; skipping group sync.');
+            return;
+        }
+
         mtrace('iMIS Bridge: Starting group sync...');
         try {
             $client = new \local_imisbridge\imis_client();

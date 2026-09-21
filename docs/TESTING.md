@@ -11,12 +11,13 @@ iMIS when no staging iMIS is available.
   `\SoapClient`; without it every path fails with a missing-class error.
 - Network access from the Moodle server to the ATS bridge WSDL endpoint.
 - An ATS-issued API AuthToken (format `MO-xxxxxx`) for the secured methods.
-- **Username = iMIS contact ID.** Every event-driven operation — login sync,
-  course-completion push, and quiz push — sends the Moodle username directly as
-  the iMIS contact ID (`UserID` for `MoodleUpdate`). This is normally set by
-  SAML2. For manual testing, create Moodle test users whose usernames are valid
-  iMIS contact IDs. A username that coincidentally matches an unrelated iMIS ID
-  will update the **wrong** contact.
+- **iMIS contact ID source.** Every event-driven operation — login sync,
+  course-completion push, and quiz push — sends a Moodle user field directly as
+  the iMIS contact ID (`UserID` for `MoodleUpdate`). The field is configurable
+  (_iMIS contact ID source_: username, ID number, or email; default **username**)
+  and is normally populated by SAML2. For manual testing, create Moodle test
+  users whose configured field holds valid iMIS contact IDs. A value that
+  coincidentally matches an unrelated iMIS ID will update the **wrong** contact.
 
 ## 1. Lock the plugin down before connecting it
 
@@ -149,9 +150,12 @@ merely by running it from a test Moodle.
    - **Completion/quiz pushes** are token-bearing, so a **scoped test AuthToken
      / test product** confines them to a throwaway iMIS contact and product.
      There is no manual push button; trigger the push through the event itself —
-     have your test user (whose username is the throwaway iMIS contact ID)
-     complete the test course or submit the graded quiz. Verify in iMIS, and
-     delete the test records afterwards.
+     have your test user complete the test course or submit the graded quiz. The
+     push sends the user's **configured iMIS ID field** (_iMIS contact ID source_:
+     username, ID number, or email), so set **that field** — not necessarily the
+     username — on the test user to the throwaway iMIS contact ID, and confirm it
+     before triggering; otherwise the push can hit the user's real production
+     contact. Verify in iMIS, and delete the test records afterwards.
    - **Enrolment / cancellation / group syncs carry no AuthToken**, so a scoped
      token does **not** constrain them. The only safe way to exercise these is a
      **staging or repointed bridge configured to call back your test Moodle**.
