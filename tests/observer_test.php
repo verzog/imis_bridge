@@ -122,7 +122,7 @@ final class observer_test extends \advanced_testcase {
     public function test_user_loggedin_skips_when_id_field_empty(): void {
         $this->resetAfterTest();
 
-        // idnumber defaults to empty for generated users.
+        // Generated users have an empty idnumber by default.
         set_config('imis_id_source', 'idnumber', 'local_imisbridge');
 
         $user = $this->getDataGenerator()->create_user(['username' => 'member123']);
