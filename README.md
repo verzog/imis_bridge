@@ -18,8 +18,8 @@ Key behaviours:
 
 ## Requirements ##
 
-* Moodle 5.0 or later.
-* PHP 8.2 or later.
+* Moodle 5.1 to 5.3 LTS.
+* PHP 8.2 or later (PHP 8.3+ on Moodle 5.2+).
 * Network access from the Moodle server to the configured iMIS WSDL endpoint.
 * An ATS-issued API AuthToken (format `MO-xxxxxx`) for the secured methods.
 

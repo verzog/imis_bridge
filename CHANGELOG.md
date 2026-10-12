@@ -4,6 +4,18 @@ All notable changes to the iMIS Bridge plugin (`local_imisbridge`) are documente
 in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-10-12
+
+### Changed
+- CI: rewrote the GitHub Actions matrix to the Moodle 5.1–5.3 LTS baseline —
+  branch-aware (MOODLE_501/502/503_STABLE plus a non-blocking Moodle `main`
+  cell), on PostgreSQL 17 and MariaDB 11. The retired Moodle 5.0 cells are
+  removed. Grunt now runs only on the 5.1 cells.
+- Raised the minimum Moodle version to 5.1 (`$plugin->requires` = `2025100600`)
+  and declared `$plugin->supported = [501, 503]`. The `requires` for 5.1 is a
+  minimum; Moodle 5.0 is no longer a declared target.
+- Updated the README and testing-guide requirements to Moodle 5.1–5.3.
+
 ## [1.4.0] - 2026-09-21
 
 Open-source release preparation. All changes are backward-compatible: existing
@@ -30,4 +42,5 @@ behaviour.
 - Generalised the privacy metadata string, `README.md`, and `docs/TESTING.md` to
   describe the configurable identifier rather than assuming the username.
 
+[1.4.1]: https://github.com/verzog/imis_bridge/releases/tag/v1.4.1
 [1.4.0]: https://github.com/verzog/imis_bridge/releases/tag/v1.4.0
