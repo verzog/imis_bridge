@@ -124,7 +124,9 @@ _Sync enrolments on login_ does **not** disable the nightly enrolment task, and
 vice versa. To stop an operation entirely, disable **both** its login toggle and
 its task toggle. The completion and quiz push toggles each gate their operation
 everywhere it runs (the observer and the queued adhoc task). The manual sync
-buttons are deliberate admin actions and are **not** gated by any toggle.
+buttons are deliberate admin actions and are **not** gated by any toggle, but
+each now prompts for confirmation before it runs — and warns explicitly when the
+contact ID is blank, since that syncs **all** users.
 
 ## 6. Testing against a production iMIS
 
