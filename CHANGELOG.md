@@ -77,7 +77,8 @@ behaviour.
 - Generalised the privacy metadata string, `README.md`, and `docs/TESTING.md` to
   describe the configurable identifier rather than assuming the username.
 
-[1.5.0]: https://github.com/verzog/imis_bridge/releases/tag/v1.5.0
-[1.4.2]: https://github.com/verzog/imis_bridge/releases/tag/v1.4.2
-[1.4.1]: https://github.com/verzog/imis_bridge/releases/tag/v1.4.1
-[1.4.0]: https://github.com/verzog/imis_bridge/releases/tag/v1.4.0
+[1.6.0]: https://github.com/verzog/imisbridge/releases/tag/v1.6.0
+[1.5.0]: https://github.com/verzog/imisbridge/releases/tag/v1.5.0
+[1.4.2]: https://github.com/verzog/imisbridge/releases/tag/v1.4.2
+[1.4.1]: https://github.com/verzog/imisbridge/releases/tag/v1.4.1
+[1.4.0]: https://github.com/verzog/imisbridge/releases/tag/v1.4.0
