@@ -4,6 +4,19 @@ All notable changes to the iMIS Bridge plugin (`local_imisbridge`) are documente
 in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-10-13
+
+### Added
+- **Bulk completions/grades pull web service.** A new read-only web service
+  function `local_imisbridge_get_completions_since` lets iMIS poll Moodle for
+  every course completion and final course grade changed since a given time,
+  in stable id order with a paging cursor (`afterid` / `nextafterid` / `hasmore`).
+  iMIS makes the call, so no extra iMIS API user licence is needed. Exposed
+  through a pre-built, restricted "iMIS bridge" service and gated by a new
+  `local/imisbridge:readcompletions` capability (granted to no role by default —
+  assign it to the dedicated web service user only). Deleted and suspended
+  users are excluded.
+
 ## [1.5.0] - 2026-10-13
 
 ### Added
