@@ -27,10 +27,18 @@ defined('MOODLE_INTERNAL') || die();
 $capabilities = [
 
     // Read course completions and grades through the bulk export web service.
-    // Granted to no role by default; assign it to the dedicated web service
-    // user only (for example via a custom role on the user's own context or the
-    // web service's allowed-users list).
+    // This exposes a site-wide export of learner identifiers, completion history
+    // and grades, so it carries the personal-data risk flag.
+    //
+    // Granted to no role by default. The check runs in the system context, so to
+    // authorise the dedicated web service user, assign them a role that holds
+    // this capability AT THE SYSTEM CONTEXT (Site administration > Users >
+    // Permissions > Assign system roles) - a role granted in the user's own
+    // context does not satisfy a system-context capability check. Adding the user
+    // to the restricted service's allowed-users list controls service access but
+    // does not, on its own, grant this capability.
     'local/imisbridge:readcompletions' => [
+        'riskbitmask'  => RISK_PERSONAL,
         'captype'      => 'read',
         'contextlevel' => CONTEXT_SYSTEM,
         'archetypes'   => [],

@@ -40,6 +40,16 @@ use core_external\external_warnings;
  * grade changed at or after {@see $since}, in stable id order with a paging
  * cursor, so a consumer can drain all changes in bounded pages.
  *
+ * Polling contract (important): the `afterid` cursor paginates WITHIN a single
+ * drain of one fixed `since` value — it is not a durable checkpoint. A consumer
+ * should: (1) record the current time before starting; (2) call repeatedly with
+ * that same `since`, passing the returned `nextafterid` back as `afterid`, until
+ * `hasmore` is false; (3) only then store the time recorded in step 1 as the new
+ * `since` for the next poll — never the newest `timemodified` returned. Each call
+ * re-scans from the start of the id order filtered by `since`, so a completion or
+ * grade that changes during a drain (even on an already-paged, lower id) is
+ * returned on the next poll rather than being skipped.
+ *
  * @package    local_imisbridge
  * @copyright  2024 Vernon Spain
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -113,7 +123,7 @@ class get_completions_since extends external_api {
         // grade changed at or after $since. Ordered and paged by completion id
         // for stable, gap-free paging. Deleted and suspended users are excluded.
         $sql = "SELECT cc.id AS ccid,
-                       u.id AS userid, u.username, u.idnumber AS useridnumber,
+                       u.id AS userid, u.username, u.idnumber AS useridnumber, u.email,
                        c.id AS courseid, c.shortname, c.idnumber AS courseidnumber,
                        cc.timecompleted,
                        gg.finalgrade, gg.timemodified AS gradetimemodified,
@@ -184,8 +194,18 @@ class get_completions_since extends external_api {
                 $timemodified = (int)$row->gradetimemodified;
             }
 
+            // Resolve the iMIS contact ID from the configured source field so an
+            // email-based (or ID-number-based) deployment gets a usable match,
+            // consistent with the observers and tasks.
+            $imisid = \local_imisbridge\util::get_imis_id((object)[
+                'username' => $row->username,
+                'idnumber' => $row->useridnumber,
+                'email'    => $row->email,
+            ]);
+
             $records[] = [
                 'userid'          => (int)$row->userid,
+                'imisid'          => $imisid,
                 'username'        => (string)$row->username,
                 'useridnumber'    => (string)$row->useridnumber,
                 'courseid'        => (int)$row->courseid,
@@ -218,6 +238,11 @@ class get_completions_since extends external_api {
             'records' => new external_multiple_structure(
                 new external_single_structure([
                     'userid'          => new external_value(PARAM_INT, 'Moodle user id.'),
+                    'imisid'          => new external_value(
+                        PARAM_RAW,
+                        'The iMIS contact ID resolved from the configured source field '
+                            . '(username, ID number or email).'
+                    ),
                     'username'        => new external_value(PARAM_RAW, 'Moodle username (the iMIS contact ID at SCCA).'),
                     'useridnumber'    => new external_value(PARAM_RAW, 'Moodle user ID number.'),
                     'courseid'        => new external_value(PARAM_INT, 'Moodle course id.'),

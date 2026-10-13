@@ -117,6 +117,7 @@ final class get_completions_since_test extends \advanced_testcase {
         $this->assertCount(1, $result['records']);
         $record = $result['records'][0];
         $this->assertSame((int)$user->id, $record['userid']);
+        $this->assertSame($user->username, $record['imisid']);
         $this->assertSame((int)$course->id, $record['courseid']);
         $this->assertSame(1000, $record['timecompleted']);
         $this->assertNull($record['graderaw']);
@@ -253,6 +254,24 @@ final class get_completions_since_test extends \advanced_testcase {
 
         $this->assertCount(1, $result['records']);
         $this->assertSame((int)$active->id, $result['records'][0]['userid']);
+    }
+
+    /**
+     * imisid is resolved from the configured source field (here, email).
+     *
+     * @return void
+     */
+    public function test_imisid_respects_source(): void {
+        $this->setAdminUser();
+        set_config('imis_id_source', 'email', 'local_imisbridge');
+        $user   = $this->getDataGenerator()->create_user(['email' => 'member@example.org']);
+        $course = $this->getDataGenerator()->create_course();
+        $this->make_completion((int)$user->id, (int)$course->id, 1000);
+
+        $result = $this->call(500);
+
+        $this->assertCount(1, $result['records']);
+        $this->assertSame('member@example.org', $result['records'][0]['imisid']);
     }
 
     /**
