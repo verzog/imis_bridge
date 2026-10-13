@@ -25,6 +25,8 @@
 $string['allusers'] = 'all users';
 $string['autosynccontrols'] = 'Automatic sync controls';
 $string['autosynccontrols_desc'] = 'Enable or disable each automatic write to iMIS. Manual syncs on the sync admin page are not affected. Turn writes off when testing against a production iMIS.';
+$string['confirmsync'] = 'This will run the sync against iMIS for contact {$a}. Continue?';
+$string['confirmsyncall'] = 'This will run the sync against iMIS for ALL users. It can create, cancel or modify records in the production iMIS. Continue?';
 $string['contactid'] = 'iMIS contact ID';
 $string['contactidhelp'] = 'Leave this blank to synchronise all users.';
 $string['contactidplaceholder'] = 'e.g. 12345';

@@ -58,12 +58,37 @@ if ($action === 'testconnection' && confirm_sesskey()) {
         $error = get_string('syncfailed', 'local_imisbridge', $e->getMessage());
     }
 } else if ($action && confirm_sesskey()) {
+    $confirmed = optional_param('confirm', 0, PARAM_BOOL);
+    $cid       = !empty($contactid) ? $contactid : null;
+
+    if (!$confirmed) {
+        // Confirm before any write: a blank contact ID syncs all users in production.
+        $warning = $cid
+            ? get_string('confirmsync', 'local_imisbridge', s($contactid))
+            : get_string('confirmsyncall', 'local_imisbridge');
+        $continueurl = new moodle_url('/local/imisbridge/admin/sync.php', [
+            'action'    => $action,
+            'contactid' => $contactid,
+            'confirm'   => 1,
+            'sesskey'   => sesskey(),
+        ]);
+
+        echo $OUTPUT->header();
+        echo $OUTPUT->heading(get_string('manualsynccontrols', 'local_imisbridge'));
+        echo $OUTPUT->confirm(
+            $warning,
+            new single_button($continueurl, get_string('continue'), 'post'),
+            new moodle_url('/local/imisbridge/admin/sync.php')
+        );
+        echo $OUTPUT->footer();
+        exit;
+    }
+
     // A full all-user sync can be slow; give it room beyond the default web limit.
     \core_php_time_limit::raise(300);
 
     try {
         $client = new \local_imisbridge\imis_client();
-        $cid    = !empty($contactid) ? $contactid : null;
         $scope  = $cid
             ? get_string('forcontact', 'local_imisbridge', s($contactid))
             : get_string('allusers', 'local_imisbridge');
