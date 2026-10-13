@@ -41,41 +41,13 @@ final class logger_test extends \advanced_testcase {
      * @return \SoapClient
      */
     private function soap_stub(string $request, string $response): \SoapClient {
-        return new class($request, $response) extends \SoapClient {
-            /** @var string Request XML. */
-            private string $req;
-            /** @var string Response XML. */
-            private string $res;
-
-            /**
-             * Construct without touching a WSDL.
-             *
-             * @param string $req Request XML.
-             * @param string $res Response XML.
-             */
-            public function __construct(string $req, string $res) {
-                $this->req = $req;
-                $this->res = $res;
-            }
-
-            /**
-             * Return the canned request.
-             *
-             * @return string|null
-             */
-            public function __getLastRequest(): ?string {
-                return $this->req;
-            }
-
-            /**
-             * Return the canned response.
-             *
-             * @return string|null
-             */
-            public function __getLastResponse(): ?string {
-                return $this->res;
-            }
-        };
+        $soap = $this->getMockBuilder(\SoapClient::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['__getLastRequest', '__getLastResponse'])
+            ->getMock();
+        $soap->method('__getLastRequest')->willReturn($request);
+        $soap->method('__getLastResponse')->willReturn($response);
+        return $soap;
     }
 
     /**
@@ -185,8 +157,7 @@ final class logger_test extends \advanced_testcase {
         global $DB;
         $this->resetAfterTest();
 
-        logger::record('MoodleUpdate', '12345', null, logger::STATUS_ERROR, null,
-            'Auth failed for token MO-badtoken');
+        logger::record('MoodleUpdate', '12345', null, logger::STATUS_ERROR, null, 'Auth failed for MO-badtoken');
 
         $row = $DB->get_record('local_imisbridge_log', ['operation' => 'MoodleUpdate'], '*', MUST_EXIST);
         $this->assertStringNotContainsString('MO-badtoken', $row->error);

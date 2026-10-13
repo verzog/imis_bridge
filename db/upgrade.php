@@ -22,8 +22,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Apply the local_imisbridge upgrade steps.
  *
@@ -36,7 +34,6 @@ function xmldb_local_imisbridge_upgrade($oldversion) {
     $dbman = $DB->get_manager();
 
     if ($oldversion < 2026101400) {
-
         // Define the audit log table.
         $table = new xmldb_table('local_imisbridge_log');
         $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);

@@ -97,8 +97,7 @@ echo html_writer::div(
         . html_writer::select($statusmenu, 'status', $status, false, ['id' => 'status', 'class' => 'ml-1']),
     'form-group'
 );
-echo html_writer::tag('button', get_string('log_filter', 'local_imisbridge'),
-    ['type' => 'submit', 'class' => 'btn btn-secondary']);
+echo html_writer::tag('button', get_string('log_filter', 'local_imisbridge'), ['type' => 'submit', 'class' => 'btn btn-secondary']);
 echo html_writer::end_div();
 echo html_writer::end_tag('form');
 
@@ -153,8 +152,10 @@ foreach ($records as $row) {
         $pre .= html_writer::tag('pre', s($row->response), ['class' => 'bg-light p-2']);
     }
     if ($pre !== '') {
-        $detail .= html_writer::tag('details',
-            html_writer::tag('summary', get_string('log_viewpayload', 'local_imisbridge')) . $pre);
+        $detail .= html_writer::tag(
+            'details',
+            html_writer::tag('summary', get_string('log_viewpayload', 'local_imisbridge')) . $pre
+        );
     }
 
     $table->data[] = [
