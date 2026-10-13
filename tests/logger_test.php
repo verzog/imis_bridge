@@ -175,4 +175,40 @@ final class logger_test extends \advanced_testcase {
         $this->assertEquals(1, $DB->count_records('local_imisbridge_log'));
         $this->assertTrue($DB->record_exists('local_imisbridge_log', ['operation' => 'new']));
     }
+
+    /**
+     * A fault message is redacted before storage, even with payload capture off.
+     *
+     * @return void
+     */
+    public function test_error_is_redacted(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        logger::record('MoodleUpdate', '12345', null, logger::STATUS_ERROR, null,
+            'Auth failed for token MO-badtoken');
+
+        $row = $DB->get_record('local_imisbridge_log', ['operation' => 'MoodleUpdate'], '*', MUST_EXIST);
+        $this->assertStringNotContainsString('MO-badtoken', $row->error);
+        $this->assertStringContainsString('MO-[redacted]', $row->error);
+    }
+
+    /**
+     * An iMIS ID that matches more than one user is left unattributed (userid 0).
+     *
+     * @return void
+     */
+    public function test_ambiguous_imisid_is_unattributed(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        set_config('imis_id_source', 'idnumber', 'local_imisbridge');
+        $this->getDataGenerator()->create_user(['idnumber' => 'DUP1']);
+        $this->getDataGenerator()->create_user(['idnumber' => 'DUP1']);
+
+        logger::record('MoodleUpdate', 'DUP1', null, logger::STATUS_SUCCESS, null, null);
+
+        $row = $DB->get_record('local_imisbridge_log', ['operation' => 'MoodleUpdate'], '*', MUST_EXIST);
+        $this->assertSame(0, (int)$row->userid);
+    }
 }

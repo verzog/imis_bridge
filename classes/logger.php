@@ -84,7 +84,8 @@ class logger {
                 $record->request  = null;
                 $record->response = null;
             }
-            $record->error       = $error;
+            // A SOAP fault can echo a rejected credential, so redact it too.
+            $record->error       = ($error === null) ? null : self::redact($error);
             $record->timecreated = time();
 
             $DB->insert_record('local_imisbridge_log', $record);
@@ -126,6 +127,7 @@ class logger {
     public static function redact(string $xml): string {
         $elements = [
             '#(<(?:\w+:)?AuthToken>).*?(</(?:\w+:)?AuthToken>)#is',
+            '#(<(?:\w+:)?Token>).*?(</(?:\w+:)?Token>)#is',
             '#(<(?:\w+:)?getTokenResult>).*?(</(?:\w+:)?getTokenResult>)#is',
         ];
         foreach ($elements as $pattern) {
@@ -138,8 +140,12 @@ class logger {
     /**
      * Resolve the Moodle user id for a logged iMIS ID using the configured source field.
      *
+     * Returns 0 when the id is empty, matches no user, or matches more than one
+     * (for example a non-unique email), so a row is never attributed to the wrong
+     * user for privacy export or erasure.
+     *
      * @param string|null $imisid The iMIS contact ID.
-     * @return int The Moodle user id, or 0 when unknown.
+     * @return int The Moodle user id, or 0 when it cannot be resolved unambiguously.
      */
     private static function resolve_userid(?string $imisid): int {
         global $DB;
@@ -148,10 +154,10 @@ class logger {
             return 0;
         }
 
-        $field  = util::imis_id_source();
-        $userid = $DB->get_field('user', 'id', [$field => $imisid], IGNORE_MULTIPLE);
+        $field = util::imis_id_source();
+        $ids   = $DB->get_fieldset_select('user', 'id', $field . ' = ?', [$imisid]);
 
-        return $userid ? (int)$userid : 0;
+        return (count($ids) === 1) ? (int)reset($ids) : 0;
     }
 
     /**

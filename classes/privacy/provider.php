@@ -63,8 +63,11 @@ class provider implements
                 'userid'      => 'privacy:metadata:local_imisbridge_log:userid',
                 'operation'   => 'privacy:metadata:local_imisbridge_log:operation',
                 'imisid'      => 'privacy:metadata:local_imisbridge_log:imisid',
+                'productcode' => 'privacy:metadata:local_imisbridge_log:productcode',
+                'status'      => 'privacy:metadata:local_imisbridge_log:status',
                 'request'     => 'privacy:metadata:local_imisbridge_log:request',
                 'response'    => 'privacy:metadata:local_imisbridge_log:response',
+                'error'       => 'privacy:metadata:local_imisbridge_log:error',
                 'timecreated' => 'privacy:metadata:local_imisbridge_log:timecreated',
             ],
             'privacy:metadata:local_imisbridge_log'

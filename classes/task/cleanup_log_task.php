@@ -47,7 +47,10 @@ class cleanup_log_task extends \core\task\scheduled_task {
      * @return void
      */
     public function execute(): void {
-        $days = (int)get_config('local_imisbridge', 'log_retention_days');
+        // Default to 90 days when the setting has not been saved yet (e.g. just
+        // after an upgrade); an explicitly saved 0 still means keep indefinitely.
+        $days = get_config('local_imisbridge', 'log_retention_days');
+        $days = ($days === false) ? 90 : (int)$days;
 
         if ($days <= 0) {
             mtrace('iMIS Bridge: audit-log retention disabled; keeping all rows.');
