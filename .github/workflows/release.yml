@@ -1,0 +1,43 @@
+name: Release zip
+
+# Builds the installable plugin zip and attaches it to the published release.
+# Publish a GitHub release whose tag matches $plugin->release in version.php
+# (for example tag v1.4.1 for release '1.4.1'); never attach the zip by hand.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@v4
+
+      - name: Verify the tag matches version.php
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          RELEASE=$(grep -oP "\->release\s*=\s*'\K[^']+" version.php)
+          echo "Release tag: ${TAG}; version.php release: ${RELEASE}"
+          if [ "${TAG#v}" != "${RELEASE}" ]; then
+            echo "::error::Tag ${TAG} does not match \$plugin->release (${RELEASE}) in version.php."
+            exit 1
+          fi
+
+      - name: Build the plugin zip
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          ZIP="local_imisbridge-${TAG}.zip"
+          # Root folder must be the plugin's install directory name (local/imisbridge),
+          # not the repository name, or Moodle's installer rejects the zip.
+          git archive --format=zip --prefix=imisbridge/ -o "${ZIP}" HEAD
+          echo "ZIP=${ZIP}" >> "${GITHUB_ENV}"
+
+      - name: Attach the zip to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" "${ZIP}" --clobber
