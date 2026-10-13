@@ -3,9 +3,25 @@
 Work top-down: each section gates the next. There is no point testing sync
 before connectivity is green, or connectivity before the plugin installs.
 
-This plugin **writes to a live iMIS instance** over SOAP. A bad run has
-real-world side effects on member records, so test against a staging Moodle and,
-wherever possible, a disposable iMIS test contact.
+This plugin **writes to a live iMIS instance** over SOAP. The write operations
+(`SendNewOrdersToMoodle`, `SendCancelledOrdersToMoodle`, `UpdateMoodleGroups`,
+`MoodleUpdate`) **create and modify records in the iMIS behind the WSDL**, and
+the ATS bridge also pushes enrolments/groups **into whatever Moodle it is
+configured to call back** — which may be your *production* Moodle. A disposable
+iMIS contact does **not** isolate either side, and repointing only the bridge's
+Moodle callback does **not** protect the iMIS data behind the WSDL. So:
+
+- **Read-only** checks (the "Test connection" button — `GetBridgeSettings` and
+  `MoodleGetUserProfile`) are safe against the production WSDL.
+- **Write** checks (§4 login sync, §5 manual sync, §7 nightly tasks) must run
+  against a **genuinely staging iMIS / bridge (a staging WSDL endpoint)** whose
+  callback Moodle is also staging — **never the production bridge/WSDL**. If you
+  only have the production WSDL, do §3 (read-only) and stop there.
+- §7's nightly tasks sync **all users** (`sync_orders(null)` etc.), so they are
+  the highest-risk write of all — only run them against a staging iMIS/bridge,
+  or keep those tasks disabled and skip §7.
+
+Take a **DB + `moodledata` backup** before you begin.
 
 ---
 
@@ -13,7 +29,8 @@ wherever possible, a disposable iMIS test contact.
 
 - [ ] Take a **DB + `moodledata` backup** of the target site.
 - [ ] Confirm the target is a **staging/test Moodle on Moodle 5.1–5.3 LTS**, not production.
-- [ ] Have the **production WSDL URL** and a **known test member's iMIS ID** ready.
+- [ ] For the write tests (§4, §5, §7): confirm you have a **genuinely staging iMIS / bridge (a staging WSDL endpoint)** whose callback Moodle is also staging. Repointing only the Moodle callback is **not** enough — the write ops still mutate the iMIS behind the WSDL. If you only have the production WSDL, do §3 (read-only connection test) and stop there.
+- [ ] Have ready: the **WSDL URL**, the **ATS API AuthToken** (`MO-…`), and a **known test member's iMIS ID**.
 - [ ] Decide which iMIS records are *safe to touch* (ideally a disposable test contact in iMIS).
 
 ## 1. Install / upgrade
@@ -24,53 +41,77 @@ wherever possible, a disposable iMIS test contact.
 
 ## 2. Configuration
 
-- [ ] Settings page loads; the **WSDL default is blank** (not a hard-coded URL).
-- [ ] With WSDL **unset**, trigger an observer event (log in) → the `util::is_configured()` guard means **no SOAP call and no crash**.
-- [ ] Set the WSDL; set **iMIS ID source** to match your SAML2 reality (`username` for this deployment).
+- [ ] Settings page loads.
+- [ ] On a **fresh install**, the **WSDL default is blank** (no hard-coded URL). *(On an upgrade this does not apply — see the upgrade check below.)*
+- [ ] On an **upgrade** from an install that had a WSDL set, the settings page **retains the existing WSDL endpoint** (configuration is preserved, not reset to blank).
+- [ ] Set the **WSDL URL** (a staging iMIS/bridge endpoint for the write tests — see the safety note above).
+- [ ] Set the **ATS API AuthToken** (`MO-…`). This is **required** for the completion/quiz pushes and for the contact-lookup part of the connection test — they call `MoodleUpdate` / `MoodleGetUserProfile`, which fail with `noauthtoken` if it is blank. *(Login enrolment/cancellation/group sync does not use the AuthToken.)*
+- [ ] Set **iMIS ID source** to match your SAML2 reality (`username` for this deployment).
+- [ ] (If testing completion/quiz) set the **course credit field** and **credit type** as needed.
 - [ ] Audit-log settings visible: `log_enabled`, `log_retention_days` (default 90), `capture_payloads` (default **off**), and the **Open log** button.
 
-## 3. Connectivity (SOAP)
+## 3. Connectivity (read-only — safe against production)
 
 - [ ] Confirm the site can reach the WSDL host (network policy allows it).
-- [ ] First real event produces a SOAP call that **succeeds** (confirm via the audit log, §6) — this validates auth + wire format end-to-end.
-- [ ] Deliberately break the WSDL (bad URL) → the call is caught, **logged as an error**, and the site does not fault.
+- [ ] **Test connection** with **no contact ID** → runs `GetBridgeSettings` (unauthenticated) and succeeds, proving reachability.
+- [ ] **Test connection** with the **test member's contact ID** → additionally runs `MoodleGetUserProfile` (uses the AuthToken), proving credentials. This should produce a **success** row in the audit log.
+- [ ] Force a **genuine SOAP fault** to exercise error logging and redaction:
+  1. Turn **`capture_payloads` on** first — otherwise no request/response is stored, and a SOAP fault need not echo the token, so there may be nothing to redact.
+  2. With a **reachable** WSDL, set the AuthToken to a present-but-**invalid** value.
+  3. Run Test connection with a contact ID → `MoodleGetUserProfile` faults server-side **inside** the logged call → an **error** row appears. With capture on, the stored request (which carried the invalid `MO-…` token) is **redacted** (`MO-[redacted]`).
+  4. *(Note: an unreachable/bad WSDL instead throws in the client constructor **before** any call is logged, so it produces no audit row — the request just fails.)*
+- [ ] **Restore the valid AuthToken** (and turn `capture_payloads` back off if you want the §6 default-off check clean) **before moving on** — otherwise the invalid token left here makes §4's completion/quiz pushes (`MoodleUpdate`) fail and a healthy observer will look broken. Re-run one read-only Test connection with a contact ID to confirm it succeeds again.
 
-## 4. Observer-driven sync (core)
+## 4. Observer-driven sync (core — staging iMIS/bridge only)
 
-Test each observer with the **test member** and verify both the iMIS-side effect
-and an audit-log row:
+Observers **queue adhoc tasks**; the SOAP calls happen when **cron** runs, not
+at the moment of the event. So after each trigger, **run cron** (or run the
+pending adhoc tasks) before checking the audit log.
 
-- [ ] **Login** (`user_loggedin`) → `MoodleUpdate` fires with the resolved iMIS ID.
-- [ ] **Course completion** (`course_completed`) → activity/completion pushed (`createActivity` / `MoodleUpdate`).
-- [ ] **Quiz submit** (`quiz_attempt_submitted`) → expected call fires with the correct product code.
+Before triggering completion/quiz, **set the test course's ID number to the
+intended safe iMIS product code** — the observer sends `course.idnumber`
+(falling back to `shortname`) as `productID`, so a blank/arbitrary value can hit
+the wrong activity or fail on mapping rather than on the observer.
+
+Verify both the iMIS-side effect and an audit-log row for each:
+
+- [ ] **Login** (`user_loggedin`) → queues the per-user sync; after cron, the **enabled** login operations run: `SendNewOrdersToMoodle`, `SendCancelledOrdersToMoodle`, `UpdateMoodleGroups` (whichever login toggles are on). *(Not `MoodleUpdate`.)*
+- [ ] **Course completion** (`course_completed`, with `push_completions` on) → after cron, `MoodleUpdate` fires with the course's ID number as the product code and the AuthToken.
+- [ ] **Quiz submit** (`quiz_attempt_submitted`, with `push_quiz_scores` on) → after cron, `MoodleUpdate` fires with the score/status. *(Preview attempts and ungraded quizzes are skipped by design.)*
 - [ ] The iMIS ID used matches the configured **source** (not blindly `$user->username` if you changed it).
-- [ ] A user **with no iMIS ID** (blank username/idnumber/email) is handled gracefully — no bogus call.
+- [ ] A user **with no iMIS ID** (blank username/idnumber/email) is handled gracefully — no task queued, no bogus call.
 
-## 5. Manual sync (`admin/sync.php`)
+## 5. Manual sync (`admin/sync.php` — staging iMIS/bridge only)
 
-- [ ] Page requires login + `moodle/site:config` (try as a non-admin → **denied**).
+- [ ] Page requires `moodle/site:config` (an account lacking it → **denied**).
 - [ ] Submitting shows the **confirmation step** (`$OUTPUT->confirm()`) *before* any write.
-- [ ] Per-user sync: enter the test member → confirm → write happens → audit row recorded.
+- [ ] Per-user sync: enter the test member → confirm → the sync operations run → audit rows recorded.
 - [ ] All-users sync with a **blank contactid** → the **all-users warning** appears on the confirm screen.
 - [ ] Sesskey check holds (stale/absent sesskey → rejected).
 
 ## 6. Audit log (new in 1.5.0 — test hard)
 
-- [ ] `admin/log.php` loads, **site-admin only** (non-admin → denied).
-- [ ] After the §4 tests, rows appear: time, user link, operation, iMIS ID, product, status badge, detail.
+- [ ] `admin/log.php` loads; an account **lacking `moodle/site:config` → denied**.
+- [ ] After the §§3–4 tests (and cron), rows appear: time, user link, operation, iMIS ID, product, status badge, detail.
 - [ ] **Filters** work — by operation and by status (success/error).
 - [ ] **Pagination** works with >50 rows.
 - [ ] **Default (capture off):** request/response are **empty** — only metadata stored.
-- [ ] Turn **`capture_payloads` on**, trigger an event → payloads appear in the collapsible detail, **redacted**: no `MO-…` tokens, no `<AuthToken>` / `<Token>` / `<getTokenResult>` values.
-- [ ] Force an **error** (bad WSDL) with capture on → error text stored **redacted** (`MO-[redacted]`), status = error.
+- [ ] Turn **`capture_payloads` on**, trigger an event + cron → payloads appear in the collapsible detail, **redacted**: no `MO-…` tokens, no `<AuthToken>` / `<Token>` / `<getTokenResult>` values.
+- [ ] Error row from the §3 fault test (capture on, reachable WSDL + invalid AuthToken) shows status = error, and its stored request has the token **redacted** (`MO-[redacted]`).
 - [ ] Ambiguous iMIS ID (two users share the configured source value) → row stored with **userid 0** (unattributed), not mis-attributed.
 
 ## 7. Scheduled tasks
 
+The `cleanup_log_task` below is local-only and always safe. The **nightly sync
+tasks are all-user writes** (`sync_orders(null)` / `sync_cancelled_orders(null)`
+→ the whole membership) against the iMIS behind the WSDL — the highest-risk
+operation in the plugin. **Only run them against a staging iMIS/bridge**; on a
+production-backed bridge, keep these tasks disabled and skip that check.
+
 - [ ] `cleanup_log_task` is listed under *Site admin → Server → Scheduled tasks* (daily, ~03:45).
 - [ ] Run it manually with retention = 90 → old rows pruned, recent kept (`mtrace` reports the count).
 - [ ] Set `log_retention_days` = **0** → task reports "retention disabled; keeping all rows," nothing deleted.
-- [ ] Any other scheduled/adhoc sync tasks run clean.
+- [ ] **(Staging iMIS/bridge only)** The nightly sync scheduled tasks run clean. On a production-backed bridge, leave them disabled and skip this.
 
 ## 8. Privacy
 
@@ -80,7 +121,7 @@ and an audit-log row:
 
 ## 9. Security / permissions spot-checks
 
-- [ ] Entry points (`sync.php`, `log.php`) enforce `require_login` → capability → sesskey (for writes).
+- [ ] Entry points (`sync.php`, `log.php`) enforce `require_login` → `require_capability('moodle/site:config')` → sesskey (for writes). Test denial with an account that **lacks** `moodle/site:config` (don't assume "non-admin" — a role granted that capability is *meant* to get in).
 - [ ] Output is escaped — try a member value containing `<b>` and confirm it renders as text, not markup.
 - [ ] No secrets in the log even with capture on (re-confirm redaction on a real token).
 
@@ -94,5 +135,7 @@ and an audit-log row:
 ## Build-specific gotchas
 
 - The wire format (field casing, dates) is the **production-proven** one. If a value looks "wrong" next to the WSDL camelCase, that is expected — do not change it mid-test.
-- Observers fire on **every** login. On a busy staging site that is a lot of calls; enable `capture_payloads` only briefly while debugging, then turn it off.
+- **Observers queue adhoc tasks**; nothing hits iMIS until cron runs. If an audit row doesn't appear, run cron before concluding anything is broken.
+- A **bad WSDL** fails in the client constructor (the adhoc task errors in cron, the user's request is unaffected) — it does **not** create an audit row. To see an *error* row, use a reachable WSDL with a faulting operation.
+- Observers fire on **every** login. On a busy staging site that is a lot of queued tasks; enable `capture_payloads` only briefly while debugging, then turn it off.
 - `capture_payloads` stores full XML. Leave it **off** except when actively investigating a specific call.
