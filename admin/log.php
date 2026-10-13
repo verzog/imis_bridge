@@ -71,7 +71,6 @@ $userids = array_filter(array_column($records, 'userid'));
 $users   = $userids ? $DB->get_records_list('user', 'id', $userids, '', '*') : [];
 
 echo $OUTPUT->header();
-echo $OUTPUT->heading(get_string('auditlog', 'local_imisbridge'));
 
 // Filter form.
 $operations = $DB->get_fieldset_sql('SELECT DISTINCT operation FROM {local_imisbridge_log} ORDER BY operation');
