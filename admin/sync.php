@@ -74,7 +74,6 @@ if ($action === 'testconnection' && confirm_sesskey()) {
         ]);
 
         echo $OUTPUT->header();
-        echo $OUTPUT->heading(get_string('manualsynccontrols', 'local_imisbridge'));
         echo $OUTPUT->confirm(
             $warning,
             new single_button($continueurl, get_string('continue'), 'post'),
@@ -122,7 +121,6 @@ if ($action === 'testconnection' && confirm_sesskey()) {
 }
 
 echo $OUTPUT->header();
-echo $OUTPUT->heading(get_string('manualsynccontrols', 'local_imisbridge'));
 
 if ($message) {
     echo $OUTPUT->notification($message, 'notifysuccess');
