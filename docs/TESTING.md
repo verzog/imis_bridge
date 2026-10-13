@@ -84,6 +84,13 @@ Note: `GetBridgeSettings` is unauthenticated. Without a contact ID the test
 confirms connectivity and the WSDL only — it does **not** prove the AuthToken is
 valid. Supply an iMIS contact ID to run an authenticated call.
 
+**Tip:** the **audit log** (_iMIS Bridge_ settings → _Open iMIS audit log_) records
+every call made to iMIS, so after any test you can see the operation, status and
+any fault. To inspect the exact SOAP request/response XML (for example to check
+the field casing and date format), turn on _Capture full request/response_ while
+testing, then turn it off again — it stores personal data, and credentials are
+redacted either way.
+
 ## 4. Understand what writes, and where
 
 | Operation | Trigger | Sends AuthToken? | Effect |

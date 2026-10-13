@@ -25,6 +25,10 @@
 namespace local_imisbridge\privacy;
 
 use core_privacy\local\metadata\collection;
+use core_privacy\local\request\approved_contextlist;
+use core_privacy\local\request\approved_userlist;
+use core_privacy\local\request\userlist;
+use core_privacy\local\request\writer;
 
 /**
  * Unit tests for {@see provider}.
@@ -36,7 +40,23 @@ use core_privacy\local\metadata\collection;
  */
 final class provider_test extends \advanced_testcase {
     /**
-     * The provider declares the external iMIS data flow.
+     * Insert one audit-log row for a user.
+     *
+     * @param int $userid The Moodle user id.
+     * @return void
+     */
+    private function insert_log(int $userid): void {
+        global $DB;
+        $DB->insert_record('local_imisbridge_log', (object)[
+            'userid'      => $userid,
+            'operation'   => 'MoodleUpdate',
+            'status'      => 'success',
+            'timecreated' => time(),
+        ]);
+    }
+
+    /**
+     * The provider declares the audit-log table and the external iMIS data flow.
      *
      * @return void
      */
@@ -48,11 +68,77 @@ final class provider_test extends \advanced_testcase {
 
         $this->assertInstanceOf(collection::class, $result);
 
-        $items = $result->get_collection();
-        $this->assertCount(1, $items);
+        $names = [];
+        foreach ($result->get_collection() as $item) {
+            $names[] = $item->get_name();
+        }
+        $this->assertContains('local_imisbridge_log', $names);
+        $this->assertContains('imis', $names);
+    }
 
-        $link = reset($items);
-        $this->assertSame('imis', $link->get_name());
-        $this->assertArrayHasKey('userid', $link->get_privacy_fields());
+    /**
+     * A user with log rows is found in the system context, and their data exports.
+     *
+     * @return void
+     */
+    public function test_get_contexts_and_export(): void {
+        $this->resetAfterTest();
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->insert_log($user->id);
+
+        $systemcontext = \context_system::instance();
+
+        $contextlist = provider::get_contexts_for_userid($user->id);
+        $this->assertEquals([$systemcontext->id], $contextlist->get_contextids());
+
+        $approved = new approved_contextlist($user, 'local_imisbridge', [$systemcontext->id]);
+        provider::export_user_data($approved);
+        $this->assertTrue(writer::with_context($systemcontext)->has_any_data());
+    }
+
+    /**
+     * Deleting one user's data leaves other users' rows intact.
+     *
+     * @return void
+     */
+    public function test_delete_for_user(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $user  = $this->getDataGenerator()->create_user();
+        $other = $this->getDataGenerator()->create_user();
+        $this->insert_log($user->id);
+        $this->insert_log($other->id);
+
+        $systemcontext = \context_system::instance();
+        $approved = new approved_contextlist($user, 'local_imisbridge', [$systemcontext->id]);
+        provider::delete_data_for_user($approved);
+
+        $this->assertEquals(0, $DB->count_records('local_imisbridge_log', ['userid' => $user->id]));
+        $this->assertEquals(1, $DB->count_records('local_imisbridge_log', ['userid' => $other->id]));
+    }
+
+    /**
+     * The userlist provider finds and deletes the right users.
+     *
+     * @return void
+     */
+    public function test_userlist(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->insert_log($user->id);
+
+        $systemcontext = \context_system::instance();
+
+        $userlist = new userlist($systemcontext, 'local_imisbridge');
+        provider::get_users_in_context($userlist);
+        $this->assertEqualsCanonicalizing([$user->id], $userlist->get_userids());
+
+        $approved = new approved_userlist($systemcontext, 'local_imisbridge', [$user->id]);
+        provider::delete_data_for_users($approved);
+        $this->assertEquals(0, $DB->count_records('local_imisbridge_log', ['userid' => $user->id]));
     }
 }

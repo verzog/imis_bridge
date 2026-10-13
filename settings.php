@@ -166,6 +166,45 @@ if ($hassiteconfig) {
         1
     ));
 
+    // Audit log controls.
+    $settings->add(new admin_setting_heading(
+        'local_imisbridge/auditlogheading',
+        get_string('auditlog', 'local_imisbridge'),
+        get_string('auditlog_desc', 'local_imisbridge')
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_imisbridge/log_enabled',
+        get_string('log_enabled', 'local_imisbridge'),
+        get_string('log_enabled_desc', 'local_imisbridge'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_imisbridge/log_retention_days',
+        get_string('log_retention_days', 'local_imisbridge'),
+        get_string('log_retention_days_desc', 'local_imisbridge'),
+        '90',
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_imisbridge/capture_payloads',
+        get_string('capture_payloads', 'local_imisbridge'),
+        get_string('capture_payloads_desc', 'local_imisbridge'),
+        0
+    ));
+
+    $settings->add(new admin_setting_heading(
+        'local_imisbridge/viewlogheading',
+        '',
+        html_writer::link(
+            new moodle_url('/local/imisbridge/admin/log.php'),
+            get_string('openlog', 'local_imisbridge'),
+            ['class' => 'btn btn-secondary']
+        )
+    ));
+
     // Manual sync controls — link to admin tool page.
     $settings->add(new admin_setting_heading(
         'local_imisbridge/manual_sync_heading',

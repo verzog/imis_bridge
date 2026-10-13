@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/imisbridge/db" VERSION="20261014" COMMENT="XMLDB file for local_imisbridge"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="local_imisbridge_log" COMMENT="Audit log of SOAP calls made to the iMIS bridge.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Moodle user id the call relates to, or 0 when unknown or all-user."/>
+        <FIELD NAME="operation" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false" COMMENT="The SOAP operation name."/>
+        <FIELD NAME="imisid" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="The iMIS contact ID sent, when applicable."/>
+        <FIELD NAME="productcode" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="The iMIS product code sent, when applicable."/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false" COMMENT="success or error."/>
+        <FIELD NAME="request" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="The SOAP request XML with the AuthToken redacted."/>
+        <FIELD NAME="response" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="The SOAP response XML."/>
+        <FIELD NAME="error" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="The fault or exception message when the call failed."/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="When the call was made."/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="userid" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="timecreated" UNIQUE="false" FIELDS="timecreated"/>
+        <INDEX NAME="operation" UNIQUE="false" FIELDS="operation"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>

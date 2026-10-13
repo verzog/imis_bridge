@@ -15,6 +15,9 @@ Key behaviours:
   an incremental group sync.
 * An admin page (Site administration > Plugins > Local plugins > iMIS Bridge)
   provides manual sync controls, optionally filtered by iMIS contact ID.
+* Every call made to iMIS is recorded in an audit log (viewable from the
+  settings page), with credentials redacted; old entries are pruned on a
+  configurable schedule.
 
 ## Requirements ##
 
@@ -62,6 +65,9 @@ Local plugins > iMIS Bridge_:
 * **Web service timeout** — how long to wait on iMIS before giving up.
 * **Default credit type** and **Credit value course field** — control the credit
   hours recorded against iMIS activity records.
+* **Audit log** — enable/disable logging, set the retention period (days), and
+  optionally capture full request/response payloads (off by default) while
+  debugging. Open the log from the *Open iMIS audit log* button.
 
 ## License ##
 
