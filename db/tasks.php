@@ -61,4 +61,16 @@ $tasks = [
         'dayofweek' => '*',
         'disabled'  => 0,
     ],
+
+    // Daily audit-log cleanup — prunes rows past the retention period.
+    [
+        'classname' => '\local_imisbridge\task\cleanup_log_task',
+        'blocking'  => 0,
+        'minute'    => '45',
+        'hour'      => '3',
+        'day'       => '*',
+        'month'     => '*',
+        'dayofweek' => '*',
+        'disabled'  => 0,
+    ],
 ];

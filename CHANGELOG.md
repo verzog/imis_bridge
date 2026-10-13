@@ -4,6 +4,21 @@ All notable changes to the iMIS Bridge plugin (`local_imisbridge`) are documente
 in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-10-13
+
+### Added
+- **iMIS audit log.** Every SOAP call to iMIS is now recorded (operation, user,
+  product, status, any fault, timestamp) in a new `local_imisbridge_log` table,
+  viewable and filterable on a new admin page (_iMIS Bridge_ settings → Open iMIS
+  audit log). Credentials (AuthToken, session tokens, `MO-` tokens) are redacted.
+- **Opt-in payload capture.** A _Capture full request/response_ setting (off by
+  default) additionally stores the full SOAP request/response XML for debugging
+  the wire format; leave it off in normal operation to avoid holding personal
+  data at rest.
+- **Configurable retention.** A daily task prunes log rows older than a
+  configurable number of days (default 90; 0 keeps them indefinitely).
+- The privacy provider now exports and erases a user's audit-log rows.
+
 ## [1.4.2] - 2026-10-13
 
 ### Added
@@ -49,6 +64,7 @@ behaviour.
 - Generalised the privacy metadata string, `README.md`, and `docs/TESTING.md` to
   describe the configurable identifier rather than assuming the username.
 
+[1.5.0]: https://github.com/verzog/imis_bridge/releases/tag/v1.5.0
 [1.4.2]: https://github.com/verzog/imis_bridge/releases/tag/v1.4.2
 [1.4.1]: https://github.com/verzog/imis_bridge/releases/tag/v1.4.1
 [1.4.0]: https://github.com/verzog/imis_bridge/releases/tag/v1.4.0

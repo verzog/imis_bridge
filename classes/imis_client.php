@@ -131,13 +131,37 @@ class imis_client {
     }
 
     /**
+     * Perform a SOAP call and record it to the audit log.
+     *
+     * Wraps the raw SOAP call so every request/response is logged exactly once,
+     * whether it succeeds or faults. Behaves identically to calling the operation
+     * on the SOAP client directly.
+     *
+     * @param string      $operation   The SOAP operation name.
+     * @param array       $params      The single parameter structure for the operation.
+     * @param string|null $imisid      The iMIS contact ID for the log, if any.
+     * @param string|null $productcode The iMIS product code for the log, if any.
+     * @return mixed The raw SOAP result object.
+     */
+    private function call(string $operation, array $params, ?string $imisid = null, ?string $productcode = null): mixed {
+        try {
+            $result = $this->soap->__soapCall($operation, [$params]);
+        } catch (\Throwable $e) {
+            logger::record($operation, $imisid, $productcode, logger::STATUS_ERROR, $this->soap, $e->getMessage());
+            throw $e;
+        }
+        logger::record($operation, $imisid, $productcode, logger::STATUS_SUCCESS, $this->soap, null);
+        return $result;
+    }
+
+    /**
      * Generate an iMIS session token for the given iMIS ID.
      *
      * @param string $imisid The iMIS contact ID.
      * @return string The generated session token.
      */
     public function get_token(string $imisid): string {
-        $result = $this->soap->getToken(['iMISID' => $imisid]);
+        $result = $this->call('getToken', ['iMISID' => $imisid], $imisid);
         return $result->getTokenResult ?? '';
     }
 
@@ -165,7 +189,7 @@ class imis_client {
      * @return bool True if the user is authorised.
      */
     public function check_authorization(string $imisid): bool {
-        $result = $this->soap->checkAuthorization(['iMISID' => $imisid]);
+        $result = $this->call('checkAuthorization', ['iMISID' => $imisid], $imisid);
         return (bool)($result->checkAuthorizationResult ?? false);
     }
 
@@ -180,10 +204,10 @@ class imis_client {
      * @return object|null The contact record, or null if not found.
      */
     public function get_contact_by_id(string $imisid): ?object {
-        $result = $this->soap->MoodleGetUserProfile([
+        $result = $this->call('MoodleGetUserProfile', [
             'ID'        => $imisid,
             'AuthToken' => $this->get_api_auth_token(),
-        ]);
+        ], $imisid);
         return $result->MoodleGetUserProfileResult ?? null;
     }
 
@@ -196,7 +220,7 @@ class imis_client {
      * @return object|null The contact record, or null if not found.
      */
     public function get_contact_by_token(string $token): ?object {
-        $result = $this->soap->MoodleGetUserProfileByToken([
+        $result = $this->call('MoodleGetUserProfileByToken', [
             'Token'     => $token,
             'AuthToken' => $this->get_api_auth_token(),
         ]);
@@ -215,7 +239,7 @@ class imis_client {
      */
     public function sync_orders(?string $contactid = null): mixed {
         $params = ['contactId' => $contactid ?? ''];
-        $result = $this->soap->SendNewOrdersToMoodle($params);
+        $result = $this->call('SendNewOrdersToMoodle', $params, $contactid);
         return $result->SendNewOrdersToMoodleResult ?? null;
     }
 
@@ -229,7 +253,7 @@ class imis_client {
      */
     public function sync_cancelled_orders(?string $contactid = null): mixed {
         $params = ['contactId' => $contactid ?? ''];
-        $result = $this->soap->SendCancelledOrdersToMoodle($params);
+        $result = $this->call('SendCancelledOrdersToMoodle', $params, $contactid);
         return $result->SendCancelledOrdersToMoodleResult ?? null;
     }
 
@@ -253,7 +277,7 @@ class imis_client {
             'CourseID'    => $courseid ?? '',
             'lastUpdated' => $lastupdated ?? '',
         ];
-        $result = $this->soap->UpdateMoodleGroups($params);
+        $result = $this->call('UpdateMoodleGroups', $params, $contactid);
         return $result->UpdateMoodleGroupsResult ?? null;
     }
 
@@ -276,7 +300,7 @@ class imis_client {
             'ProductCode'  => $productcode,
             'AuthToken'    => $this->get_api_auth_token(),
         ];
-        $result = $this->soap->getActivityByIDAndType($params);
+        $result = $this->call('getActivityByIDAndType', $params, $contactid, $productcode);
         return $result->getActivityByIDAndTypeResult ?? null;
     }
 
@@ -290,7 +314,7 @@ class imis_client {
      */
     public function create_activity(array $data): mixed {
         $data['AuthToken'] = $this->get_api_auth_token();
-        $result = $this->soap->createActivity($data);
+        $result = $this->call('createActivity', $data, $data['ContactID'] ?? null, $data['ProductCode'] ?? null);
         return $result->createActivityResult ?? null;
     }
 
@@ -333,7 +357,7 @@ class imis_client {
             'score'          => $score,
             'AuthToken'      => $this->get_api_auth_token(),
         ];
-        $result = $this->soap->MoodleUpdate($params);
+        $result = $this->call('MoodleUpdate', $params, $imisid, $moodlecoursenum);
         return $result->MoodleUpdateResult ?? null;
     }
 
@@ -346,7 +370,7 @@ class imis_client {
      */
     public function get_bridge_settings(): mixed {
         // Operation name is case-sensitive: the service advertises GetBridgeSettings.
-        $result = $this->soap->GetBridgeSettings([]);
+        $result = $this->call('GetBridgeSettings', []);
         return $result->GetBridgeSettingsResult ?? null;
     }
 
@@ -364,7 +388,7 @@ class imis_client {
     public function get_iqa_rows(string $iqapath, array $params = []): mixed {
         $params['IQAPath']   = $iqapath;
         $params['AuthToken'] = $this->get_api_auth_token();
-        $result = $this->soap->getIQARows($params);
+        $result = $this->call('getIQARows', $params);
         return $result->getIQARowsResult ?? null;
     }
 
@@ -377,6 +401,7 @@ class imis_client {
      * @return string The encrypted value.
      */
     public function encrypt(string $value): string {
+        // Not routed through the audit log: the request carries the plaintext value.
         $result = $this->soap->asiEncrypt(['value' => $value]);
         return $result->asiEncryptResult ?? '';
     }
@@ -388,6 +413,7 @@ class imis_client {
      * @return string The decrypted value.
      */
     public function decrypt(string $value): string {
+        // Not routed through the audit log: the request/response carries plaintext.
         $result = $this->soap->asiDecrypt(['value' => $value]);
         return $result->asiDecryptResult ?? '';
     }

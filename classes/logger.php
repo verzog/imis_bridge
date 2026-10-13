@@ -1,0 +1,176 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Audit logger for local_imisbridge.
+ *
+ * Records each SOAP call (operation, scope, status and the full request/response
+ * XML with the AuthToken redacted) to the local_imisbridge_log table. Logging is
+ * best-effort: a logging failure never interrupts the sync it is recording.
+ *
+ * @package    local_imisbridge
+ * @copyright  2024 Vernon Spain
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+namespace local_imisbridge;
+
+/**
+ * Writes and prunes iMIS Bridge audit-log records.
+ *
+ * @package    local_imisbridge
+ * @copyright  2024 Vernon Spain
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class logger {
+    /** @var string Status recorded for a successful call. */
+    public const STATUS_SUCCESS = 'success';
+
+    /** @var string Status recorded for a failed call. */
+    public const STATUS_ERROR = 'error';
+
+    /**
+     * Record one SOAP call to the audit log.
+     *
+     * @param string           $operation   The SOAP operation name.
+     * @param string|null      $imisid      The iMIS contact ID sent, if any.
+     * @param string|null      $productcode The iMIS product code sent, if any.
+     * @param string           $status      self::STATUS_SUCCESS or self::STATUS_ERROR.
+     * @param \SoapClient|null  $soap        The traced SOAP client, to read the last request/response.
+     * @param string|null      $error       The fault or exception message, when the call failed.
+     * @return void
+     */
+    public static function record(
+        string $operation,
+        ?string $imisid,
+        ?string $productcode,
+        string $status,
+        ?\SoapClient $soap = null,
+        ?string $error = null
+    ): void {
+        global $DB;
+
+        // Logging is best-effort: never let it break the sync it is recording.
+        try {
+            if (!self::is_enabled()) {
+                return;
+            }
+
+            $record = new \stdClass();
+            $record->userid      = self::resolve_userid($imisid);
+            $record->operation   = $operation;
+            $record->imisid      = ($imisid === null || $imisid === '') ? null : $imisid;
+            $record->productcode = ($productcode === null || $productcode === '') ? null : $productcode;
+            $record->status      = $status;
+            // Full request/response are only stored when payload capture is enabled,
+            // and always with credentials redacted.
+            if ($soap && self::is_capturing()) {
+                $record->request  = self::redact((string)$soap->__getLastRequest());
+                $record->response = self::redact((string)$soap->__getLastResponse());
+            } else {
+                $record->request  = null;
+                $record->response = null;
+            }
+            $record->error       = $error;
+            $record->timecreated = time();
+
+            $DB->insert_record('local_imisbridge_log', $record);
+        } catch (\Throwable $e) {
+            debugging('local_imisbridge: failed to write audit log: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        }
+    }
+
+    /**
+     * Whether audit logging is enabled. Unset is treated as enabled.
+     *
+     * @return bool
+     */
+    public static function is_enabled(): bool {
+        return util::is_enabled('log_enabled');
+    }
+
+    /**
+     * Whether full SOAP request/response payloads should be stored.
+     *
+     * Off by default so personal data is not kept at rest in normal operation;
+     * turn it on temporarily to capture the wire format for debugging.
+     *
+     * @return bool
+     */
+    public static function is_capturing(): bool {
+        return (bool)get_config('local_imisbridge', 'capture_payloads');
+    }
+
+    /**
+     * Redact credentials from SOAP XML before storing it.
+     *
+     * Strips the AuthToken value, the getToken session-token result, and any
+     * ATS token of the form MO-xxxxxx, in both requests and responses.
+     *
+     * @param string $xml The raw SOAP XML.
+     * @return string The XML with credentials replaced.
+     */
+    public static function redact(string $xml): string {
+        $elements = [
+            '#(<(?:\w+:)?AuthToken>).*?(</(?:\w+:)?AuthToken>)#is',
+            '#(<(?:\w+:)?getTokenResult>).*?(</(?:\w+:)?getTokenResult>)#is',
+        ];
+        foreach ($elements as $pattern) {
+            $xml = (string)preg_replace($pattern, '${1}[redacted]${2}', $xml);
+        }
+
+        return (string)preg_replace('/MO-[A-Za-z0-9]+/', 'MO-[redacted]', $xml);
+    }
+
+    /**
+     * Resolve the Moodle user id for a logged iMIS ID using the configured source field.
+     *
+     * @param string|null $imisid The iMIS contact ID.
+     * @return int The Moodle user id, or 0 when unknown.
+     */
+    private static function resolve_userid(?string $imisid): int {
+        global $DB;
+
+        if ($imisid === null || $imisid === '') {
+            return 0;
+        }
+
+        $field  = util::imis_id_source();
+        $userid = $DB->get_field('user', 'id', [$field => $imisid], IGNORE_MULTIPLE);
+
+        return $userid ? (int)$userid : 0;
+    }
+
+    /**
+     * Delete log rows older than the given number of days.
+     *
+     * @param int $days Age threshold in days; 0 or less deletes nothing.
+     * @return int The number of rows deleted.
+     */
+    public static function purge(int $days): int {
+        global $DB;
+
+        if ($days <= 0) {
+            return 0;
+        }
+
+        $cutoff = time() - ($days * DAYSECS);
+        $count  = $DB->count_records_select('local_imisbridge_log', 'timecreated < ?', [$cutoff]);
+        $DB->delete_records_select('local_imisbridge_log', 'timecreated < ?', [$cutoff]);
+
+        return $count;
+    }
+}
