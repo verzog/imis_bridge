@@ -53,7 +53,7 @@ Take a **DB + `moodledata` backup** before you begin.
 ## 3. Connectivity (read-only — safe against production)
 
 - [ ] Confirm the site can reach the WSDL host (network policy allows it).
-- [ ] **Test connection** with **no contact ID** → runs `GetBridgeSettings` (unauthenticated) and succeeds, proving reachability.
+- [ ] **Test connection** with **no contact ID** → runs `GetBridgeSettings` (the AuthToken is included when configured) and succeeds, proving reachability.
 - [ ] **Test connection** with the **test member's contact ID** → additionally runs `MoodleGetUserProfile` (uses the AuthToken), proving credentials. This should produce a **success** row in the audit log.
 - [ ] Force a **genuine SOAP fault** to exercise error logging and redaction:
   1. Turn **`capture_payloads` on** first — otherwise no request/response is stored, and a SOAP fault need not echo the token, so there may be nothing to redact.
