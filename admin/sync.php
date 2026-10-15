@@ -41,8 +41,9 @@ $error      = '';
 $testoutput = '';
 
 if ($action === 'testconnection' && confirm_sesskey()) {
-    // Read-only: verify connectivity without writing any data. GetBridgeSettings is
-    // unauthenticated, so the AuthToken is only exercised when a contact ID is given.
+    // Read-only: verify connectivity without writing any data. GetBridgeSettings
+    // sends the AuthToken when one is configured; a profile lookup (contact ID)
+    // always exercises it.
     try {
         $client = new \local_imisbridge\imis_client();
         $out    = 'GetBridgeSettings:' . PHP_EOL . var_export($client->get_bridge_settings(), true);

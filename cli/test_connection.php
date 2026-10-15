@@ -65,9 +65,10 @@ Example:
 try {
     $client = new \local_imisbridge\imis_client();
 
-    // GetBridgeSettings is unauthenticated: it verifies connectivity and the WSDL
-    // but does not exercise the AuthToken.
-    cli_heading('GetBridgeSettings (connectivity, no credentials)');
+    // GetBridgeSettings verifies connectivity and the WSDL, and includes the
+    // AuthToken when one is configured. The definitive credential check is the
+    // MoodleGetUserProfile lookup below.
+    cli_heading('GetBridgeSettings (connectivity; AuthToken sent if configured)');
     cli_writeln(var_export($client->get_bridge_settings(), true));
 
     if ($options['imisid'] !== '') {
@@ -76,8 +77,9 @@ try {
         cli_writeln(var_export($client->get_contact_by_id($options['imisid']), true));
         cli_writeln("\nConnectivity and credentials (AuthToken) verified.");
     } else {
-        cli_writeln("\nConnectivity and WSDL verified. Credentials (AuthToken) were NOT tested; "
-            . "re-run with --imisid=<valid iMIS ID> to exercise an authenticated call.");
+        cli_writeln("\nConnectivity and WSDL verified (the AuthToken was included if configured). "
+            . "For a definitive credential check, re-run with --imisid=<valid iMIS ID> to exercise "
+            . "an authenticated profile lookup.");
     }
 
     exit(0);

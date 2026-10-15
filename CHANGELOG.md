@@ -4,6 +4,29 @@ All notable changes to the iMIS Bridge plugin (`local_imisbridge`) are documente
 in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-10-15
+
+### Fixed
+- Align the SOAP client with the published `wsmoodle.asmx` WSDL contract:
+  - `MoodleUpdate`: send the contract's camelCase `userId` / `productId`
+    parameters (were `UserID` / `productID`, which the document/literal service
+    would not bind), and read the `ResultsBase` response (was a non-existent
+    `MoodleUpdateResult`).
+  - `UpdateMoodleGroups`: use `CourseId` / `LastUpdated` (were `CourseID` /
+    `lastUpdated`), send the `AuthToken`, and read the `ResultsBase` response.
+  - `SendNewOrdersToMoodle` / `SendCancelledOrdersToMoodle`: send the required
+    `AuthToken`.
+  - `GetBridgeSettings`: send the `AuthToken` when one is configured (still
+    allowing a token-less connectivity check).
+  - `MoodleGetUserProfileByToken`: use the contract's lowercase `token`
+    parameter and no `AuthToken`.
+  - `getIQARows`: pass the single `jsonParams` object (`QueryPath`,
+    `QueryFilters`, `PageSize`, `PageOffset`) the WSDL defines.
+
+### Added
+- `imis_client::setup_bridge()` wrapping the `SetupBridge` operation, returning
+  the service's log lines.
+
 ## [1.6.0] - 2026-10-13
 
 ### Added
@@ -77,6 +100,7 @@ behaviour.
 - Generalised the privacy metadata string, `README.md`, and `docs/TESTING.md` to
   describe the configurable identifier rather than assuming the username.
 
+[1.6.1]: https://github.com/verzog/imisbridge/releases/tag/v1.6.1
 [1.6.0]: https://github.com/verzog/imisbridge/releases/tag/v1.6.0
 [1.5.0]: https://github.com/verzog/imisbridge/releases/tag/v1.5.0
 [1.4.2]: https://github.com/verzog/imisbridge/releases/tag/v1.4.2
