@@ -49,20 +49,20 @@ namespace local_imisbridge;
  *   Contact lookup: get_contact_by_id* (MoodleGetUserProfile),
  *                   get_contact_by_token (MoodleGetUserProfileByToken; takes a
  *                   lowercase 'token' only, no AuthToken)
- *   Enrolment sync: sync_orders (SendNewOrdersToMoodle),
- *                   sync_cancelled_orders (SendCancelledOrdersToMoodle)
- *   Group sync:     update_groups (UpdateMoodleGroups)
+ *   Enrolment sync: sync_orders* (SendNewOrdersToMoodle),
+ *                   sync_cancelled_orders* (SendCancelledOrdersToMoodle)
+ *   Group sync:     update_groups* (UpdateMoodleGroups; returns a ResultsBase)
  *   Activities:     get_activities* (getActivityByIDAndType),
  *                   create_activity* (createActivity),
- *                   update_activity_record* (MoodleUpdate)
- *   Reporting:      get_iqa_rows* (getIQARows)
+ *                   update_activity_record* (MoodleUpdate; returns a ResultsBase)
+ *   Reporting:      get_iqa_rows* (getIQARows; single jsonParams object)
  *   (* injects the ATS API AuthToken automatically.)
  *
- * NOT advertised by wsmoodle.asmx — do NOT rely on these without confirming with
- * ATS first: get_token / get_service_token (getToken), check_authorization
+ * Confirmed ABSENT from the wsmoodle.asmx WSDL — these will fault against this
+ * service: get_token / get_service_token (getToken), check_authorization
  * (checkAuthorization), encrypt / decrypt (asiEncrypt / asiDecrypt). ATS docs
  * imply the token flow lives on the REST bridge, not this SOAP endpoint; these
- * methods are retained for that path but will fault against this service.
+ * methods are retained for that path only.
  *
  * @package    local_imisbridge
  * @copyright  2024 Vernon Spain
@@ -241,7 +241,10 @@ class imis_client {
      * @return mixed The SOAP result.
      */
     public function sync_orders(?string $contactid = null): mixed {
-        $params = ['contactId' => $contactid ?? ''];
+        $params = [
+            'AuthToken' => $this->get_api_auth_token(),
+            'contactId' => $contactid ?? '',
+        ];
         $result = $this->call('SendNewOrdersToMoodle', $params, $contactid);
         return $result->SendNewOrdersToMoodleResult ?? null;
     }
@@ -255,7 +258,10 @@ class imis_client {
      * @return mixed The SOAP result.
      */
     public function sync_cancelled_orders(?string $contactid = null): mixed {
-        $params = ['contactId' => $contactid ?? ''];
+        $params = [
+            'AuthToken' => $this->get_api_auth_token(),
+            'contactId' => $contactid ?? '',
+        ];
         $result = $this->call('SendCancelledOrdersToMoodle', $params, $contactid);
         return $result->SendCancelledOrdersToMoodleResult ?? null;
     }
@@ -276,12 +282,15 @@ class imis_client {
         ?string $lastupdated = null
     ): mixed {
         $params = [
+            'AuthToken'   => $this->get_api_auth_token(),
             'ContactID'   => $contactid ?? '',
-            'CourseID'    => $courseid ?? '',
-            'lastUpdated' => $lastupdated ?? '',
+            'CourseId'    => $courseid ?? '',
+            'LastUpdated' => $lastupdated ?? '',
         ];
         $result = $this->call('UpdateMoodleGroups', $params, $contactid);
-        return $result->UpdateMoodleGroupsResult ?? null;
+        // The response body is a ResultsBase (ResultCode/ResultMessage/Exception),
+        // not an UpdateMoodleGroupsResult wrapper.
+        return $result->ResultsBase ?? null;
     }
 
     // ACTIVITY RECORDS.
@@ -349,8 +358,9 @@ class imis_client {
         float $score
     ): mixed {
         $params = [
-            'UserID'         => $imisid,
-            'productID'      => $moodlecoursenum,
+            'AuthToken'      => $this->get_api_auth_token(),
+            'userId'         => $imisid,
+            'productId'      => $moodlecoursenum,
             'type'           => $credittype,
             'value'          => $creditvalue,
             'startDate'      => $startdate,
@@ -358,10 +368,11 @@ class imis_client {
             'grantDate'      => $grantdate,
             'status'         => $status,
             'score'          => $score,
-            'AuthToken'      => $this->get_api_auth_token(),
         ];
         $result = $this->call('MoodleUpdate', $params, $imisid, $moodlecoursenum);
-        return $result->MoodleUpdateResult ?? null;
+        // The response body is a ResultsBase (ResultCode/ResultMessage/Exception),
+        // not a MoodleUpdateResult wrapper.
+        return $result->ResultsBase ?? null;
     }
 
     // BRIDGE SETTINGS.
@@ -410,17 +421,32 @@ class imis_client {
     /**
      * Get rows from an iMIS IQA query (getIQARows).
      *
-     * AuthToken has always been required for this method.
+     * Per the WSDL this operation takes a single jsonParams object
+     * (AuthToken, QueryPath, QueryFilters, PageSize, PageOffset). The service
+     * returns its rows as JSON and the WSDL declares an empty SOAP response body,
+     * so the raw result is returned for the caller to parse; verify the exact
+     * shape against the live endpoint before relying on it. Not used by the
+     * plugin's own observers or tasks.
      *
-     * @param string $iqapath   The IQA path to query.
-     * @param array  $params    Optional additional parameters.
+     * @param string $querypath  The IQA query path.
+     * @param array  $filters    Key => value filters applied to the query.
+     * @param int    $pagesize   Rows per page.
+     * @param int    $pageoffset Zero-based page number.
      * @return mixed The SOAP result.
      */
-    public function get_iqa_rows(string $iqapath, array $params = []): mixed {
-        $params['IQAPath']   = $iqapath;
-        $params['AuthToken'] = $this->get_api_auth_token();
-        $result = $this->call('getIQARows', $params);
-        return $result->getIQARowsResult ?? null;
+    public function get_iqa_rows(string $querypath, array $filters = [], int $pagesize = 100, int $pageoffset = 0): mixed {
+        $queryfilters = [];
+        foreach ($filters as $key => $value) {
+            $queryfilters[] = ['Key' => (string)$key, 'Value' => (string)$value];
+        }
+        $jsonparams = [
+            'AuthToken'    => $this->get_api_auth_token(),
+            'QueryPath'    => $querypath,
+            'QueryFilters' => ['QueryFilter' => $queryfilters],
+            'PageSize'     => $pagesize,
+            'PageOffset'   => $pageoffset,
+        ];
+        return $this->call('getIQARows', ['jsonParams' => $jsonparams]);
     }
 
     // ENCRYPTION HELPERS.

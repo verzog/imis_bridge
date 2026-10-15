@@ -7,12 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.6.1] - 2026-10-15
 
 ### Fixed
-- Align the SOAP client with the published `wsmoodle.asmx` operation contract:
-  `GetBridgeSettings` now sends the `AuthToken` when one is configured (while
-  still allowing a token-less connectivity check), and
-  `MoodleGetUserProfileByToken` now uses the contract's lowercase `token`
-  parameter and no `AuthToken` (previously sent `Token` plus an `AuthToken` the
-  operation does not accept).
+- Align the SOAP client with the published `wsmoodle.asmx` WSDL contract:
+  - `MoodleUpdate`: send the contract's camelCase `userId` / `productId`
+    parameters (were `UserID` / `productID`, which the document/literal service
+    would not bind), and read the `ResultsBase` response (was a non-existent
+    `MoodleUpdateResult`).
+  - `UpdateMoodleGroups`: use `CourseId` / `LastUpdated` (were `CourseID` /
+    `lastUpdated`), send the `AuthToken`, and read the `ResultsBase` response.
+  - `SendNewOrdersToMoodle` / `SendCancelledOrdersToMoodle`: send the required
+    `AuthToken`.
+  - `GetBridgeSettings`: send the `AuthToken` when one is configured (still
+    allowing a token-less connectivity check).
+  - `MoodleGetUserProfileByToken`: use the contract's lowercase `token`
+    parameter and no `AuthToken`.
+  - `getIQARows`: pass the single `jsonParams` object (`QueryPath`,
+    `QueryFilters`, `PageSize`, `PageOffset`) the WSDL defines.
 
 ### Added
 - `imis_client::setup_bridge()` wrapping the `SetupBridge` operation, returning
