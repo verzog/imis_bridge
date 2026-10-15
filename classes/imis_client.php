@@ -43,10 +43,12 @@ namespace local_imisbridge;
  * each operation come from the live WSDL, so confirm with __getFunctions() /
  * __getTypes() against the target endpoint when wiring up a new call.
  *
- * Exposed by wsmoodle.asmx (confirmed against the service operation list):
- *   Bridge config:  get_bridge_settings (GetBridgeSettings)
+ * Exposed by wsmoodle.asmx (confirmed against the published operation contract):
+ *   Bridge config:  get_bridge_settings (GetBridgeSettings; accepts AuthToken),
+ *                   setup_bridge* (SetupBridge)
  *   Contact lookup: get_contact_by_id* (MoodleGetUserProfile),
- *                   get_contact_by_token* (MoodleGetUserProfileByToken)
+ *                   get_contact_by_token (MoodleGetUserProfileByToken; takes a
+ *                   lowercase 'token' only, no AuthToken)
  *   Enrolment sync: sync_orders (SendNewOrdersToMoodle),
  *                   sync_cancelled_orders (SendCancelledOrdersToMoodle)
  *   Group sync:     update_groups (UpdateMoodleGroups)
@@ -212,17 +214,18 @@ class imis_client {
     }
 
     /**
-     * Return iMIS contact info by session token (MoodleGetUserProfile).
+     * Return iMIS contact info by session token (MoodleGetUserProfileByToken).
      *
-     * Requires AuthToken as of 2025 ATS security update.
+     * Per the wsmoodle.asmx contract this operation takes a single lowercase
+     * 'token' parameter and no AuthToken. The token is one created by asiEncrypt
+     * or getToken (a REST client must use a getToken-encrypted token).
      *
      * @param string $token The SSO session token.
      * @return object|null The contact record, or null if not found.
      */
     public function get_contact_by_token(string $token): ?object {
         $result = $this->call('MoodleGetUserProfileByToken', [
-            'Token'     => $token,
-            'AuthToken' => $this->get_api_auth_token(),
+            'token' => $token,
         ]);
         return $result->MoodleGetUserProfileByTokenResult ?? null;
     }
@@ -366,12 +369,40 @@ class imis_client {
     /**
      * Return the Moodle bridge settings as configured in iMIS.
      *
+     * The service contract lists an AuthToken parameter, so it is sent when one
+     * is configured; the call is still made without it so a connectivity check
+     * can run before the token has been entered.
+     *
      * @return mixed The SOAP result.
      */
     public function get_bridge_settings(): mixed {
         // Operation name is case-sensitive: the service advertises GetBridgeSettings.
-        $result = $this->call('GetBridgeSettings', []);
+        $params = [];
+        $token  = get_config('local_imisbridge', 'auth_token');
+        if (!empty($token)) {
+            $params['AuthToken'] = $token;
+        }
+        $result = $this->call('GetBridgeSettings', $params);
         return $result->GetBridgeSettingsResult ?? null;
+    }
+
+    /**
+     * Run the ATS bridge setup/verification routine (SetupBridge).
+     *
+     * Returns the log lines the service emits describing what it checked or set.
+     *
+     * @return string[] The log lines returned by the service.
+     */
+    public function setup_bridge(): array {
+        $result = $this->call('SetupBridge', [
+            'AuthToken' => $this->get_api_auth_token(),
+        ]);
+        $log = $result->SetupBridgeResult->Log->string ?? [];
+        // A single <string> element deserialises to a scalar; normalise to a list.
+        if (is_string($log)) {
+            $log = [$log];
+        }
+        return is_array($log) ? array_values($log) : [];
     }
 
     // IQA.

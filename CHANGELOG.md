@@ -4,6 +4,20 @@ All notable changes to the iMIS Bridge plugin (`local_imisbridge`) are documente
 in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-10-15
+
+### Fixed
+- Align the SOAP client with the published `wsmoodle.asmx` operation contract:
+  `GetBridgeSettings` now sends the `AuthToken` when one is configured (while
+  still allowing a token-less connectivity check), and
+  `MoodleGetUserProfileByToken` now uses the contract's lowercase `token`
+  parameter and no `AuthToken` (previously sent `Token` plus an `AuthToken` the
+  operation does not accept).
+
+### Added
+- `imis_client::setup_bridge()` wrapping the `SetupBridge` operation, returning
+  the service's log lines.
+
 ## [1.6.0] - 2026-10-13
 
 ### Added
@@ -77,6 +91,7 @@ behaviour.
 - Generalised the privacy metadata string, `README.md`, and `docs/TESTING.md` to
   describe the configurable identifier rather than assuming the username.
 
+[1.6.1]: https://github.com/verzog/imisbridge/releases/tag/v1.6.1
 [1.6.0]: https://github.com/verzog/imisbridge/releases/tag/v1.6.0
 [1.5.0]: https://github.com/verzog/imisbridge/releases/tag/v1.5.0
 [1.4.2]: https://github.com/verzog/imisbridge/releases/tag/v1.4.2
